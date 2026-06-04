@@ -26,9 +26,10 @@ def _make_episode(memory_id: str, embedding: list, tenant_id: str = "t1"):
 
 
 def _mock_timescale(episodes):
-    """Create a TimescaleMemoryStore-like mock with fallback_storage."""
+    """Create a TimescaleMemoryStore-like mock with fallback_storage and get_all_memories."""
     ts = MagicMock()
     ts.fallback_storage = episodes
+    ts.get_all_memories = MagicMock(return_value=episodes)
     return ts
 
 
@@ -187,3 +188,28 @@ class TestCosineDistance:
         c = MemoryConsolidator(MagicMock(), MagicMock())
         d = c.compute_cosine_distance([0.0, 0.0], [1.0, 2.0])
         assert d == 1.0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Database Query Routing
+# ─────────────────────────────────────────────────────────────────────
+
+class TestConsolidationDatabaseRoute:
+    """Verifies that the consolidation cycle uses the get_all_memories method if available."""
+
+    def test_database_fetch_called(self):
+        ts = MagicMock()
+        # Ensure fallback_storage is not present on the mock to test the get_all_memories branch
+        if hasattr(ts, 'fallback_storage'):
+            del ts.fallback_storage
+        ts.get_all_memories = MagicMock(return_value=[
+            _make_episode("e1", [1.0, 0.0]),
+            _make_episode("e2", [0.99, 0.01])
+        ])
+
+        neo = MagicMock()
+        c = MemoryConsolidator(ts, neo)
+        c.run_consolidation_cycle("t1", eps=0.2)
+
+        ts.get_all_memories.assert_called_once_with("t1")
+        assert neo.upsert_relationship.call_count > 0

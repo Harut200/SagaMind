@@ -31,11 +31,12 @@ class MemoryConsolidator:
         logger.info(f"[Sleep Cycle] Starting consolidation cycle for tenant: '{tenant_id}'")
 
         # 1. Fetch memories
-        if hasattr(self.db, 'fallback_storage'):
+        if hasattr(self.db, 'get_all_memories'):
+            episodes = self.db.get_all_memories(tenant_id)
+        elif hasattr(self.db, 'fallback_storage'):
             episodes = [m for m in self.db.fallback_storage if m["tenant_id"] == tenant_id]
         else:
-            # Query from Postgres
-            episodes = [] # In real env, query from database
+            episodes = []
 
         if len(episodes) < 2:
             logger.info("Insufficient memories to run sleep consolidation cycle.")

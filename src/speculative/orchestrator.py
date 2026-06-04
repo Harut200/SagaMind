@@ -3,6 +3,8 @@ import logging
 import uuid
 from typing import Any
 
+from src.config import settings
+
 logger = logging.getLogger("SagaMind.Speculative")
 
 class SpeculativeOrchestrator:
@@ -44,7 +46,7 @@ class SpeculativeOrchestrator:
         }
 
         # Check authorization of the arguments
-        if "path" in args and not args["path"].startswith("/Users/Harutyun/Desktop/Portfolio1"):
+        if "path" in args and not args["path"].startswith(settings.allowed_workspace_root):
             return {
                 "sandbox_id": sandbox_id,
                 "command": tool,

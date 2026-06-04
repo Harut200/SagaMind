@@ -151,3 +151,36 @@ class TimescaleMemoryStore:
         finally:
             self.pool.putconn(conn)
         return memories
+
+    def get_all_memories(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Retrieves all episodic memories for a specific tenant (used in consolidation)."""
+        if not self.pool_active:
+            return [m for m in self.fallback_storage if m["tenant_id"] == tenant_id]
+
+        conn = self.pool.getconn()
+        memories = []
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT memory_id, created_at, last_retrieved_at, agent_role, summary, importance_score, retrieval_count, embedding, context_data
+                    FROM episodic_memories
+                    WHERE tenant_id = %s;
+                """, (tenant_id,))
+                rows = cursor.fetchall()
+                for r in rows:
+                    memories.append({
+                        "memory_id": str(r[0]),
+                        "created_at": r[1],
+                        "last_retrieved_at": r[2],
+                        "agent_role": r[3],
+                        "summary": r[4],
+                        "importance_score": r[5],
+                        "retrieval_count": r[6],
+                        "embedding": list(r[7]),
+                        "context_data": r[8]
+                    })
+        except Exception as e:
+            logger.error(f"Failed to retrieve all memories from TimescaleDB: {str(e)}")
+        finally:
+            self.pool.putconn(conn)
+        return memories
