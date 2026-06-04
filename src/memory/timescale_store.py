@@ -1,8 +1,9 @@
-import logging
 import json
+import logging
 import math
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from typing import Any
+
 from src.config import settings
 
 logger = logging.getLogger("SagaMind.Memory.Timescale")
@@ -15,11 +16,10 @@ class TimescaleMemoryStore:
     def __init__(self):
         self.conn = None
         self.pool_active = False
-        self.fallback_storage: List[Dict[str, Any]] = []
+        self.fallback_storage: list[dict[str, Any]] = []
 
         try:
             import psycopg2
-            from psycopg2 import pool
             # Attempt to establish connections pool
             self.pool = psycopg2.pool.SimpleConnectionPool(
                 1, 10,
@@ -65,10 +65,10 @@ class TimescaleMemoryStore:
         finally:
             self.pool.putconn(conn)
 
-    def write_episodic_memory(self, memory_id: str, tenant_id: str, agent_role: str, summary: str, importance: float, embedding: List[float], context: Optional[Dict[str, Any]] = None):
+    def write_episodic_memory(self, memory_id: str, tenant_id: str, agent_role: str, summary: str, importance: float, embedding: list[float], context: dict[str, Any] | None = None):
         """Inserts a new episodic memory node."""
         now = datetime.now(timezone.utc)
-        
+
         if not self.pool_active:
             self.fallback_storage.append({
                 "memory_id": memory_id,
@@ -100,7 +100,7 @@ class TimescaleMemoryStore:
         finally:
             self.pool.putconn(conn)
 
-    def retrieve_similar_memories(self, tenant_id: str, query_embedding: List[float], limit: int = 5) -> List[Dict[str, Any]]:
+    def retrieve_similar_memories(self, tenant_id: str, query_embedding: list[float], limit: int = 5) -> list[dict[str, Any]]:
         """Queries episodic memories using cosine distance calculations."""
         if not self.pool_active:
             # Fallback cosine distance search in-memory
@@ -111,7 +111,7 @@ class TimescaleMemoryStore:
                 # Calculate cosine similarity
                 u = item["embedding"]
                 v = query_embedding
-                dot = sum(a*b for a, b in zip(u, v))
+                dot = sum(a*b for a, b in zip(u, v, strict=True))
                 norm_u = math.sqrt(sum(a*a for a in u))
                 norm_v = math.sqrt(sum(b*b for b in v))
                 similarity = (dot / (norm_u * norm_v)) if (norm_u > 0 and norm_v > 0) else 0.0
@@ -132,7 +132,7 @@ class TimescaleMemoryStore:
                     ORDER BY embedding <=> %s
                     LIMIT %s;
                 """, (tenant_id, query_embedding, limit))
-                
+
                 rows = cursor.fetchall()
                 for r in rows:
                     memories.append({

@@ -13,7 +13,7 @@ Verification Strategy:
 """
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Any
 
 from src.config import settings
 
@@ -29,13 +29,13 @@ class Z3Verifier:
     def __init__(self):
         self.z3_active = False
         try:
-            import z3
+            import z3  # noqa: F401
             self.z3_active = True
             logger.info("Z3 Solver Python bindings successfully loaded.")
         except ImportError:
             logger.warning("z3-solver package not installed. Running semantic validation fallback.")
 
-    def verify(self, action_args: Dict[str, Any], invariants_string: str) -> Tuple[bool, str]:
+    def verify(self, action_args: dict[str, Any], invariants_string: str) -> tuple[bool, str]:
         """
         Runs check-sat solver on logic statements.
 
@@ -53,7 +53,7 @@ class Z3Verifier:
         solver = z3.Solver()
 
         # 1. Declare variables dynamically based on action arguments
-        z3_vars: Dict[str, Any] = {}
+        z3_vars: dict[str, Any] = {}
         for key, val in action_args.items():
             if isinstance(val, str):
                 z3_vars[key] = z3.String(key)
@@ -87,7 +87,7 @@ class Z3Verifier:
         else:
             return False, "SMT Solver returned unknown or failed to resolve equations."
 
-    def _fallback_verify(self, action_args: Dict[str, Any]) -> Tuple[bool, str]:
+    def _fallback_verify(self, action_args: dict[str, Any]) -> tuple[bool, str]:
         """
         Semantic validation fallback when Z3 solver is not available.
         Performs basic string prefix checks for path-based invariants.

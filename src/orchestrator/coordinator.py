@@ -11,13 +11,12 @@ Architecture:
     - Each step passes through a Z3 verification gate before sandbox execution.
 """
 
-import time
 import logging
-import uuid
-from typing import List, Dict, Any, Callable, Optional
+import time
+from collections.abc import Callable
+from typing import Any
 
-from src.config import settings
-from src.models import ActionPayload, SagaStep, SagaStatus, StepStatus
+from src.models import SagaStatus, StepStatus
 
 # Setup logging channel
 logger = logging.getLogger("SagaMind.Orchestrator")
@@ -34,11 +33,11 @@ class SagaTransactionCoordinator:
     non-deterministic multi-agent paths.
     """
 
-    def __init__(self, verifier_instance: Any, sandbox_instance: Any, db_client: Optional[Any] = None):
+    def __init__(self, verifier_instance: Any, sandbox_instance: Any, db_client: Any | None = None):
         self.verifier = verifier_instance
         self.sandbox = sandbox_instance
         self.db = db_client
-        self.active_sagas: Dict[str, Dict[str, Any]] = {}
+        self.active_sagas: dict[str, dict[str, Any]] = {}
 
     def start_transaction_log(self, saga_id: str, goal: str, tenant_id: str):
         """Initialize a new saga transaction session."""
@@ -57,8 +56,8 @@ class SagaTransactionCoordinator:
     def execute_saga(
         self,
         saga_id: str,
-        steps: List[Any],
-        callback: Optional[Callable[[Any, str, str], None]] = None
+        steps: list[Any],
+        callback: Callable[[Any, str, str], None] | None = None
     ) -> bool:
         """
         Executes a sequence of SagaStep tasks.
@@ -96,7 +95,7 @@ class SagaTransactionCoordinator:
                     return False
 
                 # 2. Execute in sandbox
-                res = self.sandbox.execute(step.action)
+                self.sandbox.execute(step.action)
                 step.status = StepStatus.COMMITTED.value
                 completed.append(step)
                 logger.info(f"[SAGA-{saga_id}] Step '{step.step_name}' executed and committed successfully.")
@@ -124,8 +123,8 @@ class SagaTransactionCoordinator:
     def execute_compensations(
         self,
         saga_id: str,
-        completed_steps: List[Any],
-        callback: Optional[Callable[[Any, str, str], None]] = None
+        completed_steps: list[Any],
+        callback: Callable[[Any, str, str], None] | None = None
     ):
         """
         Executes compensations in reverse chronological order (LIFO).

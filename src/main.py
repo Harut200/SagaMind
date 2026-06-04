@@ -10,25 +10,24 @@ Exposes RESTful endpoints for:
     - Health monitoring
 """
 
-import uvicorn
-import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import uvicorn
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Local SagaMind imports
 from src.config import settings
 from src.logging_config import configure_logging, get_logger
-from src.models import ActionPayload, SagaStep, MemoryNode
+from src.memory.consolidation import MemoryConsolidator
+from src.memory.decay import EbbinghausMemoryManager
+from src.memory.neo4j_store import Neo4jGraphStore
+from src.memory.timescale_store import TimescaleMemoryStore
+from src.models import ActionPayload, MemoryNode, SagaStep
 from src.orchestrator.coordinator import SagaTransactionCoordinator
 from src.orchestrator.sandbox import WasmSandbox
 from src.verifier.z3_prover import Z3Verifier
-from src.memory.timescale_store import TimescaleMemoryStore
-from src.memory.neo4j_store import Neo4jGraphStore
-from src.memory.decay import EbbinghausMemoryManager
-from src.memory.consolidation import MemoryConsolidator
 
 # Initialize logging
 configure_logging()
@@ -71,9 +70,9 @@ class StepProposal(BaseModel):
     saga_id: str
     step_name: str
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     compensation_tool: str
-    compensation_arguments: Dict[str, Any]
+    compensation_arguments: dict[str, Any]
     invariants: str
 
 

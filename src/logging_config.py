@@ -12,12 +12,11 @@ Usage::
     logger = get_logger("SagaMind.MyModule")
 """
 
+import json
 import logging
 import logging.config
 import sys
-import json
 from datetime import datetime, timezone
-from typing import Optional
 
 from src.config import settings
 
@@ -65,7 +64,7 @@ class ColorizedFormatter(logging.Formatter):
         return super().format(record)
 
 
-def configure_logging(env: Optional[str] = None) -> None:
+def configure_logging(env: str | None = None) -> None:
     """
     Initialize the global logging configuration.
 

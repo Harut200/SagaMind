@@ -7,11 +7,9 @@ LIFO compensations on verification failure / runtime exception,
 compensation failure handling, and callback invocation.
 """
 
-import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-from src.models import ActionPayload, SagaStep, StepStatus
-
+from src.models import ActionPayload, SagaStep
 
 # ─────────────────────────────────────────────────────────────────────
 # Transaction Initialization

@@ -9,11 +9,11 @@ Note: These tests exercise the *fallback* code path (z3-solver not
 required at test time) which is the semantic validation branch.
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from src.verifier.z3_prover import Z3Verifier
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Fixture — verifier in fallback mode (z3 not importable)

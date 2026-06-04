@@ -7,9 +7,9 @@ All store initializations in src.main are patched to prevent
 real database connections during testing.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ─────────────────────────────────────────────────────────────────────
 # Patch all external store constructors BEFORE importing the app.
@@ -48,6 +48,7 @@ def client():
 
         # Force reload of the module so singletons pick up mocks
         import importlib
+
         import src.main
         importlib.reload(src.main)
 

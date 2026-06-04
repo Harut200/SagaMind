@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 
 class Settings:
@@ -49,7 +48,7 @@ class Settings:
 
         # ── Engine ──────────────────────────────────────────────────
         self.z3_path: str = os.getenv("Z3_PATH", "z3")
-        self.openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
+        self.openai_api_key: str | None = os.getenv("OPENAI_API_KEY", None)
         self.embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
         self.consolidation_model: str = os.getenv("CONSOLIDATION_MODEL", "gpt-4")
 

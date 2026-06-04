@@ -6,11 +6,9 @@ Tests the MemoryConsolidator's DBSCAN-style clustering and Neo4j
 graph relationship writing.  All external stores are mocked.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
 from src.memory.consolidation import MemoryConsolidator
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Helpers

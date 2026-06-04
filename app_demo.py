@@ -9,21 +9,20 @@ Usage:
     streamlit run app_demo.py
 """
 
-import streamlit as st
 import time
-import math
 import uuid
-import pandas as pd
-import numpy as np
-import plotly.express as px
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from src.models import ActionPayload, SagaStep, MemoryNode
-from src.verifier.z3_prover import Z3Verifier
-from src.orchestrator.sandbox import WasmSandbox
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
 from src.memory.decay import EbbinghausMemoryManager
+from src.models import ActionPayload, MemoryNode, SagaStep
 from src.orchestrator.coordinator import SagaTransactionCoordinator
-from src.memory.consolidation import MemoryConsolidator
+from src.orchestrator.sandbox import WasmSandbox
+from src.verifier.z3_prover import Z3Verifier
 
 # Set page config with premium styling
 st.set_page_config(
@@ -130,19 +129,19 @@ st.sidebar.info("Use this control center to simulate LLM transactions, safety in
 # Build 3 column metric display
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown("""
+    st.markdown(f"""
     <div class='metric-card'>
         <p style='margin:0;color:#718096;font-size:0.9rem;'>Active Transaction State</p>
-        <h2 style='margin:5px 0 0 0;color:#4D96FF;'>{}</h2>
+        <h2 style='margin:5px 0 0 0;color:#4D96FF;'>{st.session_state.saga_status}</h2>
     </div>
-    """.format(st.session_state.saga_status), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 with col2:
-    st.markdown("""
+    st.markdown(f"""
     <div class='metric-card'>
         <p style='margin:0;color:#718096;font-size:0.9rem;'>Saga Memory Nodes</p>
-        <h2 style='margin:5px 0 0 0;color:#50E3C2;'>{} Active Traces</h2>
+        <h2 style='margin:5px 0 0 0;color:#50E3C2;'>{len(st.session_state.memory_bank)} Active Traces</h2>
     </div>
-    """.format(len(st.session_state.memory_bank)), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 with col3:
     st.markdown("""
     <div class='metric-card'>

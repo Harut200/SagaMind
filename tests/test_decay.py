@@ -10,13 +10,12 @@ retrieval reinforcement, zero-importance edge case, and the
 evaluate_memories partition function.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-import math
-from datetime import datetime, timezone, timedelta
 
-from src.models import MemoryNode
 from src.memory.decay import EbbinghausMemoryManager
-
+from src.models import MemoryNode
 
 # ─────────────────────────────────────────────────────────────────────
 # Fixture

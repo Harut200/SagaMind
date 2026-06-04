@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Any, List
+from typing import Any
+
 from src.config import settings
 
 logger = logging.getLogger("SagaMind.Memory.Neo4j")
@@ -13,8 +14,8 @@ class Neo4jGraphStore:
         self.driver = None
         self.active = False
         # In-memory adjacency list fallback for graph simulation
-        self.fallback_nodes: Dict[str, Dict[str, Any]] = {}
-        self.fallback_relationships: List[Dict[str, Any]] = []
+        self.fallback_nodes: dict[str, dict[str, Any]] = {}
+        self.fallback_relationships: list[dict[str, Any]] = []
 
         try:
             from neo4j import GraphDatabase

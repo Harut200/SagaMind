@@ -11,9 +11,9 @@ Security Model:
     - Memory limits prevent heap exhaustion (default 256MB).
 """
 
-import os
 import logging
-from typing import Dict, Any, Optional
+import os
+from typing import Any
 
 from src.config import settings
 
@@ -48,7 +48,7 @@ class WasmSandbox:
         except (ImportError, Exception):
             logger.warning("Wasmtime package not installed or failed to boot. Initializing mock sandboxed emulator.")
 
-    def execute(self, action: Any) -> Dict[str, Any]:
+    def execute(self, action: Any) -> dict[str, Any]:
         """
         Executes action code inside the sandbox.
 
@@ -68,7 +68,7 @@ class WasmSandbox:
                 # In production: compile tool to WASM bytecode and execute WASI methods
                 pass
             except Exception as e:
-                raise SandboxError(f"Wasm runtime compilation error: {str(e)}")
+                raise SandboxError(f"Wasm runtime compilation error: {str(e)}") from e
 
         # Perform mock operations for files and database interactions
         if action.tool_name == "WRITE_FILE":
@@ -89,7 +89,7 @@ class WasmSandbox:
                     f.write(content)
                 return {"status": "SUCCESS", "written_path": path, "bytes": len(content)}
             except Exception as e:
-                raise SandboxError(f"Failed to write file to sandboxed disk layer: {str(e)}")
+                raise SandboxError(f"Failed to write file to sandboxed disk layer: {str(e)}") from e
 
         elif action.tool_name == "DATABASE_QUERY":
             # Simulate transactional SQL queries

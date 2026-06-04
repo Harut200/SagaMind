@@ -14,10 +14,9 @@ Design Rationale:
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from typing import Any
 
 # ─────────────────────────────────────────────────────────────────────
 # Enumerations
@@ -53,7 +52,7 @@ class StepStatus(str, enum.Enum):
 class ActionPayload:
     """Describes a single tool invocation with its arguments."""
     tool_name: str
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -84,8 +83,8 @@ class SandboxResult:
     """Typed result from sandbox execution."""
     success: bool
     status: str = "SUCCESS"
-    data: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    data: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -114,9 +113,9 @@ class MemoryNode:
     summary: str
     importance_score: float
     retrieval_count: int
-    embedding: List[float] = field(default_factory=list)
+    embedding: list[float] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for storage and transport."""
         return asdict(self)
 
@@ -136,4 +135,4 @@ class SagaTransaction:
     goal: str
     status: str = SagaStatus.RUNNING.value
     start_time: float = 0.0
-    completed_steps: List[SagaStep] = field(default_factory=list)
+    completed_steps: list[SagaStep] = field(default_factory=list)
