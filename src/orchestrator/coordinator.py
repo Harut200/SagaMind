@@ -1,0 +1,174 @@
+"""
+SagaMind Saga Transaction Coordinator
+======================================
+
+Stateful saga transaction engine enforcing eventual consistency across
+non-deterministic multi-agent execution paths.
+
+Architecture:
+    - Forward execution: steps are committed sequentially through verification gates.
+    - Rollback: compensations are executed in LIFO (reverse chronological) order.
+    - Each step passes through a Z3 verification gate before sandbox execution.
+"""
+
+import time
+import logging
+import uuid
+from typing import List, Dict, Any, Callable, Optional
+
+from src.config import settings
+from src.models import ActionPayload, SagaStep, SagaStatus, StepStatus
+
+# Setup logging channel
+logger = logging.getLogger("SagaMind.Orchestrator")
+
+
+class CoordinatorError(Exception):
+    """Custom exception class for Coordinator-level transaction failures."""
+    pass
+
+
+class SagaTransactionCoordinator:
+    """
+    Stateful Saga transaction engine enforcing consistency across
+    non-deterministic multi-agent paths.
+    """
+
+    def __init__(self, verifier_instance: Any, sandbox_instance: Any, db_client: Optional[Any] = None):
+        self.verifier = verifier_instance
+        self.sandbox = sandbox_instance
+        self.db = db_client
+        self.active_sagas: Dict[str, Dict[str, Any]] = {}
+
+    def start_transaction_log(self, saga_id: str, goal: str, tenant_id: str):
+        """Initialize a new saga transaction session."""
+        self.active_sagas[saga_id] = {
+            "saga_id": saga_id,
+            "tenant_id": tenant_id,
+            "goal": goal,
+            "status": SagaStatus.RUNNING.value,
+            "start_time": time.time(),
+            "completed_steps": []
+        }
+        logger.info(f"[SAGA-{saga_id}] Transaction initialized for tenant '{tenant_id}'. Goal: '{goal}'")
+        if self.db:
+            self.db.write_transaction_state(saga_id, SagaStatus.RUNNING.value, {"goal": goal})
+
+    def execute_saga(
+        self,
+        saga_id: str,
+        steps: List[Any],
+        callback: Optional[Callable[[Any, str, str], None]] = None
+    ) -> bool:
+        """
+        Executes a sequence of SagaStep tasks.
+
+        Args:
+            saga_id:  Unique saga transaction identifier.
+            steps:    Ordered list of SagaStep instances.
+            callback: Optional status change callback ``fn(step, status, error)``.
+
+        Returns:
+            True if the entire chain succeeded, False if a rollback occurred.
+        """
+        if saga_id not in self.active_sagas:
+            self.start_transaction_log(saga_id, "Workflow Execution", "default_tenant")
+
+        saga_meta = self.active_sagas[saga_id]
+        completed = saga_meta["completed_steps"]
+
+        for step in steps:
+            step.status = StepStatus.RUNNING.value
+            logger.info(f"[SAGA-{saga_id}] Initiating Step: '{step.step_name}'")
+            if callback:
+                callback(step, StepStatus.RUNNING.value, "")
+
+            try:
+                # 1. Verification Gate
+                ver_ok, explanation = self.verifier.verify(step.action.arguments, step.invariants)
+                if not ver_ok:
+                    step.status = StepStatus.FAILED.value
+                    step.error = f"Logic Solver check failed: {explanation}"
+                    logger.error(f"[SAGA-{saga_id}] Invariant violation at step '{step.step_name}': {explanation}")
+                    if callback:
+                        callback(step, StepStatus.FAILED.value, step.error)
+                    self.execute_compensations(saga_id, completed, callback)
+                    return False
+
+                # 2. Execute in sandbox
+                res = self.sandbox.execute(step.action)
+                step.status = StepStatus.COMMITTED.value
+                completed.append(step)
+                logger.info(f"[SAGA-{saga_id}] Step '{step.step_name}' executed and committed successfully.")
+                if callback:
+                    callback(step, StepStatus.COMMITTED.value, "")
+
+            except Exception as e:
+                step.status = StepStatus.FAILED.value
+                step.error = f"Runtime Execution Exception: {str(e)}"
+                logger.error(
+                    f"[SAGA-{saga_id}] Exception at step '{step.step_name}': {step.error}",
+                    exc_info=True
+                )
+                if callback:
+                    callback(step, StepStatus.FAILED.value, step.error)
+                self.execute_compensations(saga_id, completed, callback)
+                return False
+
+        saga_meta["status"] = SagaStatus.COMMITTED.value
+        if self.db:
+            self.db.write_transaction_state(saga_id, SagaStatus.COMMITTED.value, {})
+        logger.info(f"[SAGA-{saga_id}] Saga transaction committed successfully.")
+        return True
+
+    def execute_compensations(
+        self,
+        saga_id: str,
+        completed_steps: List[Any],
+        callback: Optional[Callable[[Any, str, str], None]] = None
+    ):
+        """
+        Executes compensations in reverse chronological order (LIFO).
+        Guarantees eventual consistency by undoing committed mutations.
+        """
+        logger.warning(f"[SAGA-{saga_id}] Initiating rollback for {len(completed_steps)} completed steps.")
+        if self.db:
+            self.db.write_transaction_state(saga_id, SagaStatus.COMPENSATING.value, {})
+
+        for step in reversed(completed_steps):
+            step.status = StepStatus.COMPENSATING.value
+            logger.info(f"[SAGA-{saga_id}] Reverting step: '{step.step_name}'")
+            if callback:
+                callback(step, StepStatus.COMPENSATING.value, "")
+
+            try:
+                comp_ok = self.sandbox.execute_compensation(step.compensation)
+                if comp_ok:
+                    step.status = StepStatus.ROLLED_BACK.value
+                    logger.info(f"[SAGA-{saga_id}] Rollback complete for step: '{step.step_name}'")
+                    if callback:
+                        callback(step, StepStatus.ROLLED_BACK.value, "")
+                else:
+                    step.status = StepStatus.COMPENSATION_FAILED.value
+                    logger.error(f"[SAGA-{saga_id}] [CRITICAL] Compensation failed for step '{step.step_name}'!")
+                    if callback:
+                        callback(step, StepStatus.COMPENSATION_FAILED.value, "Compensation execution failed.")
+                    if self.db:
+                        self.db.write_transaction_state(
+                            saga_id, SagaStatus.COMPENSATION_FAILED.value,
+                            {"failed_step": step.step_name}
+                        )
+                    return
+            except Exception as e:
+                step.status = StepStatus.COMPENSATION_FAILED.value
+                logger.error(
+                    f"[SAGA-{saga_id}] [CRITICAL] Exception during rollback for step '{step.step_name}': {str(e)}"
+                )
+                if callback:
+                    callback(step, StepStatus.COMPENSATION_FAILED.value, str(e))
+                return
+
+        self.active_sagas[saga_id]["status"] = SagaStatus.ROLLED_BACK.value
+        if self.db:
+            self.db.write_transaction_state(saga_id, SagaStatus.ROLLED_BACK.value, {})
+        logger.warning(f"[SAGA-{saga_id}] Rollback complete. Eventual consistency restored.")
