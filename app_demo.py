@@ -27,7 +27,7 @@ from src.verifier.z3_prover import Z3Verifier
 # Set page config with premium styling
 st.set_page_config(
     page_title="SagaMind Control Center",
-    page_icon="🧠",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -76,7 +76,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # App Title & Header
-st.markdown("<h1 class='main-title'>🧠 SagaMind</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>SagaMind</h1>", unsafe_allow_html=True)
 st.markdown("<p class='tagline'>Transaction-Safe Multi-Agent Runtime & Episodic Memory Co-Processor</p>", unsafe_allow_html=True)
 
 # Initialize Session States
@@ -120,7 +120,7 @@ if "memory_bank" not in st.session_state:
     ]
 
 # Sidebar configuration controls
-st.sidebar.markdown("### 🎛️ Control Panel")
+st.sidebar.markdown("### Control Panel")
 decay_rate = st.sidebar.slider("Base Forgetting Half-Life (Hours)", 2.0, 48.0, 12.0)
 retention_threshold = st.sidebar.slider("Eviction Threshold (τ)", 0.05, 0.5, 0.15)
 st.sidebar.markdown("---")
@@ -156,7 +156,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 left_col, right_col = st.columns([1.2, 1])
 
 with left_col:
-    st.subheader("🛠️ Transactional Agent Pipeline Simulation")
+    st.subheader("Transactional Agent Pipeline Simulation")
     st.write("Trigger agent actions. Watch the verification gate approve safe steps or trigger rollbacks on violation.")
 
     # Preset scenarios
@@ -165,7 +165,7 @@ with left_col:
         ["Scenario A: Safe Code Rewrite (Expect Success)", "Scenario B: Path Traversal Exploit (Expect Saga Rollback)"]
     )
 
-    if st.button("🚀 Trigger Simulation"):
+    if st.button("Trigger Simulation"):
         st.session_state.logs = []
         st.session_state.saga_status = "RUNNING"
 
@@ -242,7 +242,7 @@ with left_col:
         )
 
 with right_col:
-    st.subheader("🧠 Cognitive Memory Decay (Ebbinghaus Curves)")
+    st.subheader("Cognitive Memory Decay (Ebbinghaus Curves)")
     st.write("Understand memory retention values. Memories decay exponentially over time unless reinforced.")
 
     # Memory decay chart visualization
@@ -282,7 +282,7 @@ with right_col:
     mem_records = []
     for m in st.session_state.memory_bank:
         ret = manager.calculate_retention(m)
-        status = "🟢 Active" if ret >= retention_threshold else "🔴 Evicted"
+        status = "Active" if ret >= retention_threshold else "Evicted"
         mem_records.append({
             "Summary": m.summary,
             "Role": m.agent_role,

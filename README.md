@@ -1,4 +1,4 @@
-# 🧠 SagaMind
+# SagaMind
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/your-username/sagamind/blob/main/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-green.svg)](https://python.org)
@@ -10,7 +10,7 @@
 
 ---
 
-## 🚀 Why SagaMind?
+## Why SagaMind?
 
 Deploying multi-agent networks in production software environments is currently bottlenecked by two major failures:
 1.  **State Corruption (Brittle execution):** When an agent executes a sequence of API, file, or database commands and fails at step 8, the environment is left corrupted.
@@ -34,7 +34,7 @@ SagaMind resolves this by introducing an **Agentic Saga Transaction Protocol**, 
 
 ---
 
-## ✨ Features
+## Features
 
 *   **Transactional Saga Execution:** Treat agent actions as local transactions with stateful, LIFO-ordered compensating rollbacks to clean the environment when failures occur.
 *   **Tiered Memory Consolidation:** Active memory decay using Hermann Ebbinghaus forgetting curves. A background "sleep cycle" DBSCAN-clusters episodic logs and distills them into a Neo4j semantic concept graph.
@@ -43,19 +43,19 @@ SagaMind resolves this by introducing an **Agentic Saga Transaction Protocol**, 
 
 ---
 
-## 📊 Comparison with Existing Frameworks
+## Comparison with Existing Frameworks
 
 | Feature | LangGraph / CrewAI | Mem0 / Cognee | **SagaMind** |
 | :--- | :--- | :--- | :--- |
-| **Transaction Safety** | ❌ (DAGs only, no rollback) | ❌ | **Yes (Saga Compensations)** |
-| **Active Memory Decay**| ❌ (Linear context growth) | ⚠️ (Static retrieval) | **Yes (Ebbinghaus Math)** |
-| **Graph Consolidation**| ❌ | ⚠️ (No sleep cycle) | **Yes (DBSCAN Sleep Distillation)**|
-| **Formal Invariants**  | ❌ | ❌ | **Yes (Z3 SMT Invariant Proving)** |
-| **Speculative Run**    | ❌ (Sequential) | ❌ | **Yes (Parallel COW Sandboxing)** |
+| **Transaction Safety** | (DAGs only, no rollback) | | **Yes (Saga Compensations)** |
+| **Active Memory Decay**| (Linear context growth) | (Static retrieval) | **Yes (Ebbinghaus Math)** |
+| **Graph Consolidation**| | (No sleep cycle) | **Yes (DBSCAN Sleep Distillation)**|
+| **Formal Invariants**  | | | **Yes (Z3 SMT Invariant Proving)** |
+| **Speculative Run**    | (Sequential) | | **Yes (Parallel COW Sandboxing)** |
 
 ---
 
-## ⚙️ Quick Start
+## Quick Start
 
 ### 1. Prerequisite Setup
 Ensure you have Python 3.9+ and optionally the Z3 solver binary installed on your system.
@@ -78,7 +78,7 @@ streamlit run app_demo.py
 
 ---
 
-## 🛠️ Architecture Deep Dive
+## Architecture Deep Dive
 
 For exhaustive theoretical and technical specifications, explore the repository documents:
 *   [research_paper.md](research_paper.md) - Theoretical foundations, CLS memory model, and SMT solving invariants.
@@ -88,8 +88,8 @@ For exhaustive theoretical and technical specifications, explore the repository 
 
 ---
 
-## 🤝 Contributing
+## Contributing
 We welcome contributions! Please check our Contribution Guidelines and join our community.
 
-## 📄 License
+## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
