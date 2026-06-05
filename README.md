@@ -65,15 +65,31 @@ Ensure you have Python 3.9+ and optionally the Z3 solver binary installed on you
 git clone https://github.com/your-username/sagamind.git
 cd sagamind
 
-# Install python dependencies
-pip install -r requirements.txt
+# Install the core runtime
+pip install -e .
+
+# ...or install everything for local development (dashboard, wasm, grpc, dev tools)
+pip install -e ".[dev,dashboard,wasm,grpc,llm]"
 ```
 
+All external backends (TimescaleDB, Neo4j, wasmtime, Z3, OpenAI) degrade gracefully to
+in-memory or deterministic fallbacks, so the API, the dashboard, and the full test-suite
+run with no services configured.
+
 ### 2. Launch the Interactive Dashboard Demo
-SagaMind includes a beautiful, premium visual dashboard showing the live transaction rollback flows, memory decay values, and Z3 symbolic verification logs.
+SagaMind includes a premium visual dashboard showing live transaction rollback flows,
+memory decay values, and Z3 symbolic verification logs.
 
 ```bash
+pip install -e ".[dashboard]"
 streamlit run app_demo.py
+```
+
+### 3. Run the API or the full stack
+
+```bash
+make run                # REST API on :8000 (OpenAPI at /docs)
+docker compose up --build   # API + TimescaleDB + Neo4j + Redis
 ```
 
 ---
