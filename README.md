@@ -1,7 +1,7 @@
 # SagaMind
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/your-username/sagamind/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-green.svg)](https://python.org)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://python.org)
 [![gRPC](https://img.shields.io/badge/gRPC-v1.54-orange.svg)](https://grpc.io)
 [![Z3 Solver](https://img.shields.io/badge/Z3%20SMT-v4.12-blueviolet.svg)](https://github.com/Z3Prover/z3)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-Wasmtime-red.svg)](https://wasmtime.dev)
@@ -84,7 +84,7 @@ For exhaustive theoretical and technical specifications, explore the repository 
 *   [research_paper.md](research_paper.md) - Theoretical foundations, CLS memory model, and SMT solving invariants.
 *   [system_architecture.md](system_architecture.md) - Subsystem interactions, WebAssembly COW sandbox configs, and sequence flows.
 *   [specifications.md](specifications.md) - SQL schemas, Neo4j graphs, gRPC proto, and core algorithms.
-*   [arcitecture_exp.md](arcitecture_exp.md) - Complete system specification with a full runnable code engine.
+*   [architecture_exp.md](architecture_exp.md) - Complete system specification with a full runnable code engine.
 
 ---
 
