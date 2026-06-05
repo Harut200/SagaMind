@@ -4,32 +4,39 @@ A full end-to-end review of SagaMind: what is real, what is a stub, what must be
 before this is production-grade, where a faster language buys you something, and which features
 would raise it from "impressive demo" to "deployable system."
 
-Status today: **79/79 tests pass, but they are entirely mock-based.** No external service is
-actually exercised. The architecture is sound and the code is clean; the gap is that most of the
-"hard" integrations degrade to in-memory fallbacks, and a few headline features are stubs.
+Status today: **126/126 tests pass** (was 79); ruff + mypy clean. The headline correctness,
+security, and feature gaps from the original review have been remediated on this branch — the
+sections below are retained for rationale and now carry a status marker. What remains is
+genuinely-harder infrastructure work (true microVM isolation, durable distributed sagas,
+observability) and the performance roadmap.
 
 Legend: **[BUG]** real defect · **[STUB]** advertised but not implemented · **[GAP]** missing for
 production · **[PERF]** speed opportunity · **[FEAT]** new capability.
+Status: ✅ done · 🟡 partial · ⬜ not started.
 
 ---
 
 ## 0. Severity-ordered summary
 
-| # | Item | Type | Effort |
+| # | Item | Type | Status |
 |---|------|------|--------|
-| 1 | `psycopg2.pool` never imported → DB always falls back to memory | BUG | XS |
-| 2 | WASM sandbox performs no isolation; writes straight to host disk | STUB/SEC | L |
-| 3 | Z3 verifier ignores arbitrary invariants (only `str.prefixof`/`path`) | STUB | M |
-| 4 | No API authentication / authorization / rate limiting | GAP/SEC | M |
-| 5 | Committed default secrets; no fail-closed in production | GAP/SEC | S |
-| 6 | Saga state is in-process only; lost on restart (Redis unused) | GAP | M |
-| 7 | gRPC surface entirely missing despite deps/ports | STUB | M |
-| 8 | Speculative execution is an `asyncio.sleep` simulation, unwired | STUB | M |
-| 9 | Consolidation: O(n^2) pure-Python clustering; LLM distill unwired | STUB/PERF | M |
-| 10 | No embedding generation (OpenAI client never instantiated) | GAP | S |
-| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | M |
-| 12 | `app_demo` decay path mixes naive/aware datetimes | BUG | XS |
-| 13 | Vector/decay math in pure Python — vectorize or move to a fast lang | PERF | M–L |
+| 1 | `psycopg2.pool` never imported → DB always falls back to memory | BUG | ✅ fixed |
+| 2 | WASM sandbox performs no isolation; writes straight to host disk | STUB/SEC | 🟡 real path-jail + allow-list + fuel; microVM still TODO |
+| 3 | Z3 verifier ignores arbitrary invariants (only `str.prefixof`/`path`) | STUB | ✅ general SMT-LIB2 refutation + timeout |
+| 4 | No API authentication / authorization / rate limiting | GAP/SEC | ✅ API key + CORS + body limit + rate limit |
+| 5 | Committed default secrets; no fail-closed in production | GAP/SEC | ✅ fail-closed config; secrets via `.env` |
+| 6 | Saga state is in-process only; lost on restart (Redis unused) | GAP | 🟡 status API + bounded retention; durable store designed, not wired |
+| 7 | gRPC surface entirely missing despite deps/ports | STUB | ✅ proto + async server + codegen |
+| 8 | Speculative execution is an `asyncio.sleep` simulation, unwired | STUB | ✅ real parallel validation + winner-commit + endpoint + tests |
+| 9 | Consolidation: O(n^2) pure-Python clustering; LLM distill unwired | STUB/PERF | ✅ NumPy-vectorised + LLM label hook |
+| 10 | No embedding generation (OpenAI client never instantiated) | GAP | ✅ `EmbeddingService` (OpenAI + deterministic fallback) |
+| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | 🟡 CI + coverage gate + pre-commit; live-service integration tests TODO |
+| 12 | `app_demo` decay path mixes naive/aware datetimes | BUG | ✅ tz-normalised + regression test |
+| 13 | Vector/decay math in pure Python — vectorize or move to a fast lang | PERF | 🟡 NumPy vectorised; Rust/ANN roadmap below |
+
+**Remaining headline work:** true sandboxed execution of untrusted tool code (WASM/microVM,
+§2.1), durable + distributed sagas (§3.6, §6), observability/metrics/tracing (§5.3), managed
+migrations (§5.4), live-service integration tests (§5.1), and the performance ladder (§4).
 
 ---
 
