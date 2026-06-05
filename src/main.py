@@ -219,6 +219,13 @@ def health_check() -> HealthResponse:
     )
 
 
+@app.get("/metrics")
+def prometheus_metrics() -> Response:
+    """Prometheus scrape endpoint (public). No-op payload if prometheus_client is absent."""
+    payload, content_type = metrics.exposition()
+    return Response(content=payload, media_type=content_type)
+
+
 @app.post("/saga/start", dependencies=_PROTECTED)
 def start_saga(payload: StartSagaRequest) -> dict[str, str]:
     """Initialize a new saga transaction session."""
