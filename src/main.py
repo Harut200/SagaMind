@@ -77,14 +77,25 @@ speculative = SpeculativeOrchestrator(sandbox)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
-    logger.info("SagaMind API starting (env=%s, auth=%s).", settings.env, settings.auth_enabled)
+    logger.info(
+        "SagaMind API starting (env=%s, auth=%s, saga_store=%s).",
+        settings.env, settings.auth_enabled, saga_store.backend,
+    )
+    # Crash recovery: roll back any saga left incomplete by a previous process.
+    try:
+        recovered = coordinator.recover()
+        if recovered:
+            logger.warning("Recovered (rolled back) %d incomplete saga(s) on startup.", recovered)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Saga recovery on startup failed: %s", exc)
     try:
         yield
     finally:
-        try:
-            neo4j.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Error closing Neo4j driver on shutdown: %s", exc)
+        for name, closer in (("Neo4j", neo4j.close), ("saga store", saga_store.close)):
+            try:
+                closer()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Error closing %s on shutdown: %s", name, exc)
         logger.info("SagaMind API shut down cleanly.")
 
 
