@@ -46,6 +46,7 @@ class TestRecover:
         from src.models import ActionPayload, SagaStep
 
         coord = SagaTransactionCoordinator(verifier, sandbox, db_client=store)
+        coord.start_transaction_log("saga-d", "persist test", "t1")
         step = SagaStep(
             step_id="x",
             step_name="write",

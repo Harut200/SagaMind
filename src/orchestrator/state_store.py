@@ -121,10 +121,9 @@ class SagaStateStore:
             return self._pg_pool.getconn()
 
     def _pg_return(self, conn: Any) -> None:
-        try:
+        import contextlib
+        with contextlib.suppress(Exception):
             self._pg_pool.putconn(conn)
-        except Exception:  # noqa: BLE001
-            pass
 
     def _ensure_pg_schema(self) -> None:
         conn = self._pg_conn()

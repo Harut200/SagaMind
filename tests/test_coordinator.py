@@ -24,18 +24,18 @@ class TestStartTransaction:
 
         assert "saga-100" in coordinator.active_sagas
         saga = coordinator.active_sagas["saga-100"]
-        assert saga["saga_id"] == "saga-100"
-        assert saga["tenant_id"] == "tenant-A"
-        assert saga["goal"] == "Deploy service"
-        assert saga["status"] == "RUNNING"
-        assert saga["completed_steps"] == []
-        assert saga["start_time"] > 0
+        assert saga.saga_id == "saga-100"
+        assert saga.tenant_id == "tenant-A"
+        assert saga.goal == "Deploy service"
+        assert saga.status == "RUNNING"
+        assert saga.completed_steps == []
+        assert saga.start_time > 0
 
     def test_start_transaction_idempotent_overwrite(self, coordinator):
         """Calling start twice overwrites the previous saga entry."""
         coordinator.start_transaction_log("saga-200", "goal-1", "t1")
         coordinator.start_transaction_log("saga-200", "goal-2", "t2")
-        assert coordinator.active_sagas["saga-200"]["goal"] == "goal-2"
+        assert coordinator.active_sagas["saga-200"].goal == "goal-2"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ class TestExecuteSagaSuccess:
         result = coordinator.execute_saga("saga-ok", sample_steps)
 
         assert result is True
-        assert coordinator.active_sagas["saga-ok"]["status"] == "COMMITTED"
+        assert coordinator.active_sagas["saga-ok"].status == "COMMITTED"
         # Every step should have been committed
         for step in sample_steps:
             assert step.status == "COMMITTED"
@@ -60,11 +60,13 @@ class TestExecuteSagaSuccess:
         # No compensations should have fired
         mock_sandbox.execute_compensation.assert_not_called()
 
-    def test_auto_creates_saga_if_missing(self, coordinator, sample_steps):
-        """execute_saga auto-initialises a saga when the id is unknown."""
-        result = coordinator.execute_saga("saga-auto", sample_steps)
-        assert result is True
-        assert "saga-auto" in coordinator.active_sagas
+    def test_raises_for_unknown_saga_id(self, coordinator, sample_steps):
+        """execute_saga raises CoordinatorError for an unknown saga_id."""
+        import pytest
+
+        from src.orchestrator.coordinator import CoordinatorError
+        with pytest.raises(CoordinatorError, match="not found"):
+            coordinator.execute_saga("saga-unknown", sample_steps)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -182,6 +184,7 @@ class TestRollbackOnExecutionException:
         mock_sandbox.execute = MagicMock(side_effect=ValueError("bad input"))
 
         coord = SagaTransactionCoordinator(mock_verifier, mock_sandbox)
+        coord.start_transaction_log("saga-err", "err test", "t1")
         step = SagaStep(
             step_id="s1",
             step_name="step-1",
@@ -317,6 +320,7 @@ class TestCallbackInvocation:
     def test_callback_receives_step_object(self, coordinator):
         """The first argument to the callback is always the SagaStep itself."""
         cb = MagicMock()
+        coordinator.start_transaction_log("saga-track", "track test", "t1")
         step = SagaStep(
             step_id="s1",
             step_name="tracked",

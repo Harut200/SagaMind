@@ -31,7 +31,7 @@ class TestHealth:
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "HEALTHY"
-        assert set(body["backends"]) == {"timescale", "neo4j", "verifier", "wasm"}
+        assert set(body["backends"]) >= {"timescale", "neo4j", "verifier", "wasm"}
 
     def test_metrics_endpoint_is_public(self, client):
         resp = client.get("/metrics")

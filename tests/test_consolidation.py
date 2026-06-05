@@ -99,8 +99,8 @@ class TestClustering:
         num_clusters = c.run_consolidation_cycle("t1", eps=0.2)
         assert num_clusters == 1
 
-    def test_distant_vectors_separate_clusters(self):
-        """Orthogonal vectors with eps=0.05 should form separate clusters."""
+    def test_isolated_vectors_treated_as_noise(self):
+        """Orthogonal vectors are all isolated — DBSCAN min_samples=2 marks them noise → 0 clusters."""
         episodes = [
             _make_episode("e1", [1.0, 0.0, 0.0]),
             _make_episode("e2", [0.0, 1.0, 0.0]),
@@ -111,8 +111,26 @@ class TestClustering:
         c = MemoryConsolidator(ts, neo)
 
         num_clusters = c.run_consolidation_cycle("t1", eps=0.05)
-        # Each vector is far from the others; all isolated → 3 clusters
-        assert num_clusters == 3
+        # Each vector has no neighbours within eps — all noise, no concepts written.
+        assert num_clusters == 0
+        neo.upsert_relationship.assert_not_called()
+
+    def test_two_dense_groups_form_two_clusters(self):
+        """Two tight groups of similar vectors should yield two distinct DBSCAN clusters."""
+        episodes = [
+            # Group A — nearly identical, direction [1, 0]
+            _make_episode("a1", [1.0, 0.0]),
+            _make_episode("a2", [0.99, 0.01]),
+            # Group B — nearly identical, direction [0, 1]
+            _make_episode("b1", [0.0, 1.0]),
+            _make_episode("b2", [0.01, 0.99]),
+        ]
+        ts = _mock_timescale(episodes)
+        neo = MagicMock()
+        c = MemoryConsolidator(ts, neo)
+
+        num_clusters = c.run_consolidation_cycle("t1", eps=0.05)
+        assert num_clusters == 2
 
 
 # ─────────────────────────────────────────────────────────────────────

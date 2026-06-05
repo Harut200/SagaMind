@@ -152,15 +152,15 @@ class SagaTransactionCoordinator:
 
         for step in steps:
             # ── Idempotency check ────────────────────────────────────────
-            if step.idempotency_key and self.db and hasattr(self.db, "step_already_committed"):
-                if self.db.step_already_committed(saga_id, step.idempotency_key):
-                    logger.info(
-                        "[SAGA-%s] Step '%s' already committed (idempotency_key=%s). Skipping.",
-                        saga_id, step.step_name, step.idempotency_key,
-                    )
-                    step.status = StepStatus.COMMITTED.value
-                    completed.append(step)
-                    continue
+            if (step.idempotency_key and self.db and hasattr(self.db, "step_already_committed")
+                    and self.db.step_already_committed(saga_id, step.idempotency_key)):
+                logger.info(
+                    "[SAGA-%s] Step '%s' already committed (idempotency_key=%s). Skipping.",
+                    saga_id, step.step_name, step.idempotency_key,
+                )
+                step.status = StepStatus.COMMITTED.value
+                completed.append(step)
+                continue
 
             step.status = StepStatus.RUNNING.value
             logger.info("[SAGA-%s] Initiating Step: '%s'", saga_id, step.step_name)
