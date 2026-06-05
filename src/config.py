@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
 
+    # Force a specific saga-state backend ("memory" | "redis" | "postgres").
+    # Empty = auto-detect (Postgres → Redis → memory). Tests pin this to "memory".
+    state_store_backend: str = ""
+
     # ── Engine / LLM ────────────────────────────────────────────────────
     z3_path: str = "z3"
     z3_timeout_ms: int = 5000

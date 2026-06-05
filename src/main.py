@@ -80,7 +80,9 @@ speculative = SpeculativeOrchestrator(sandbox)
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     logger.info(
         "SagaMind API starting (env=%s, auth=%s, saga_store=%s).",
-        settings.env, settings.auth_enabled, saga_store.backend,
+        settings.env,
+        settings.auth_enabled,
+        saga_store.backend,
     )
     # Crash recovery: roll back any saga left incomplete by a previous process.
     try:

@@ -50,7 +50,18 @@ class SagaStateStore:
         self._state: dict[str, dict[str, Any]] = {}
         self._comps: dict[str, list[dict[str, Any]]] = {}
 
-        if self._try_postgres():
+        forced = settings.state_store_backend.lower()
+        if forced == "memory":
+            pass  # explicit in-memory (hermetic tests / single-process dev)
+        elif forced == "postgres":
+            if not self._try_postgres():
+                raise RuntimeError("STATE_STORE_BACKEND=postgres but Postgres is unavailable.")
+            self.backend = "postgres"
+        elif forced == "redis":
+            if not self._try_redis():
+                raise RuntimeError("STATE_STORE_BACKEND=redis but Redis is unavailable.")
+            self.backend = "redis"
+        elif self._try_postgres():  # auto-detect, most-durable first
             self.backend = "postgres"
         elif self._try_redis():
             self.backend = "redis"
@@ -82,9 +93,7 @@ class SagaStateStore:
         try:
             import redis
 
-            self._redis = redis.Redis(
-                host=settings.redis_host, port=settings.redis_port, decode_responses=True
-            )
+            self._redis = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
             self._redis.ping()
             return True
         except Exception as exc:  # noqa: BLE001 - optional backend
@@ -141,8 +150,7 @@ class SagaStateStore:
         if self.backend == "postgres":
             with self._pg.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO saga_compensations (saga_id, seq, tool_name, arguments) "
-                    "VALUES (%s, %s, %s, %s);",
+                    "INSERT INTO saga_compensations (saga_id, seq, tool_name, arguments) VALUES (%s, %s, %s, %s);",
                     (saga_id, seq, tool_name, json.dumps(arguments)),
                 )
         elif self.backend == "redis":
@@ -193,8 +201,7 @@ class SagaStateStore:
             saga_ids = [str(r[0]) for r in cur.fetchall()]
             for sid in saga_ids:
                 cur.execute(
-                    "SELECT tool_name, arguments FROM saga_compensations "
-                    "WHERE saga_id = %s ORDER BY seq;",
+                    "SELECT tool_name, arguments FROM saga_compensations WHERE saga_id = %s ORDER BY seq;",
                     (sid,),
                 )
                 comps = [{"tool_name": r[0], "arguments": r[1]} for r in cur.fetchall()]

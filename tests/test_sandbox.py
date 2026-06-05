@@ -5,6 +5,8 @@ SagaMind — Sandbox Tests
 Validates the filesystem jail, tool allow-list, typed results, and compensation logic.
 """
 
+import importlib.util
+
 import pytest
 
 from src.models import ActionPayload, SandboxResult
@@ -80,3 +82,12 @@ class TestCompensation:
     def test_unknown_compensation_rejected(self, jailed_sandbox):
         sandbox, _ = jailed_sandbox
         assert sandbox.execute_compensation(ActionPayload("WIPE_DISK", {})) is False
+
+
+class TestWasmIsolation:
+    def test_run_wasm_requires_runtime_when_absent(self, jailed_sandbox):
+        sandbox, _ = jailed_sandbox
+        if importlib.util.find_spec("wasmtime") is not None:
+            pytest.skip("wasmtime present; runtime-absent path not exercised")
+        with pytest.raises(SandboxError):
+            sandbox.run_wasm_module(b"\x00asm\x01\x00\x00\x00")

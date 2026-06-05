@@ -5,13 +5,19 @@ SagaMind Test Suite — Shared Fixtures
 Provides reusable mocks and sample data for every test module.
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+import os
 
-import pytest
+# Pin the saga-state backend to in-memory BEFORE any src import constructs `settings`,
+# so the unit suite is hermetic and never touches a developer's live Redis/Postgres.
+os.environ.setdefault("STATE_STORE_BACKEND", "memory")
 
-from src.models import ActionPayload, MemoryNode, SagaStep
-from src.orchestrator.coordinator import SagaTransactionCoordinator
+from datetime import datetime, timedelta, timezone  # noqa: E402
+from unittest.mock import MagicMock  # noqa: E402
+
+import pytest  # noqa: E402
+
+from src.models import ActionPayload, MemoryNode, SagaStep  # noqa: E402
+from src.orchestrator.coordinator import SagaTransactionCoordinator  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────
 # Verifier Fixtures

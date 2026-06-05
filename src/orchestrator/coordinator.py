@@ -77,9 +77,7 @@ class SagaTransactionCoordinator:
             logger.warning("[RECOVERY] Compensating %d step(s) for incomplete saga %s", len(comps), saga_id)
             for comp in reversed(comps):
                 try:
-                    self.sandbox.execute_compensation(
-                        ActionPayload(comp["tool_name"], comp.get("arguments", {}))
-                    )
+                    self.sandbox.execute_compensation(ActionPayload(comp["tool_name"], comp.get("arguments", {})))
                 except Exception as exc:  # noqa: BLE001 - best-effort recovery, continue
                     logger.error("[RECOVERY] Compensation failed for saga %s: %s", saga_id, exc)
             self.db.write_transaction_state(saga_id, SagaStatus.ROLLED_BACK.value, {"recovered": True})
@@ -117,9 +115,7 @@ class SagaTransactionCoordinator:
         metrics.inc("sagas_started")
         logger.info(f"[SAGA-{saga_id}] Transaction initialized for tenant '{tenant_id}'. Goal: '{goal}'")
         if self.db:
-            self.db.write_transaction_state(
-                saga_id, SagaStatus.RUNNING.value, {"goal": goal, "tenant_id": tenant_id}
-            )
+            self.db.write_transaction_state(saga_id, SagaStatus.RUNNING.value, {"goal": goal, "tenant_id": tenant_id})
 
     def execute_saga(
         self, saga_id: str, steps: list[Any], callback: Callable[[Any, str, str], None] | None = None
@@ -168,9 +164,7 @@ class SagaTransactionCoordinator:
                 completed.append(step)
                 # Persist the compensation so a crash mid-saga can be rolled back on recovery.
                 if self.db and hasattr(self.db, "append_compensation"):
-                    self.db.append_compensation(
-                        saga_id, step.compensation.tool_name, step.compensation.arguments
-                    )
+                    self.db.append_compensation(saga_id, step.compensation.tool_name, step.compensation.arguments)
                 logger.info(f"[SAGA-{saga_id}] Step '{step.step_name}' executed and committed successfully.")
                 if callback:
                     callback(step, StepStatus.COMMITTED.value, "")

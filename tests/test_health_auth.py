@@ -33,6 +33,10 @@ class TestHealth:
         assert body["status"] == "HEALTHY"
         assert set(body["backends"]) == {"timescale", "neo4j", "verifier", "wasm"}
 
+    def test_metrics_endpoint_is_public(self, client):
+        resp = client.get("/metrics")
+        assert resp.status_code == 200
+
 
 class TestAuthDisabledByDefault:
     def test_saga_start_open_when_no_keys(self, client):
