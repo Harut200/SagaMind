@@ -53,6 +53,7 @@ dev = [
     "httpx>=0.24.0",
     "ruff>=0.6.0",
     "mypy>=1.5.0",
+    "hypothesis>=6.100.0",
 ]
 dashboard = [
     "streamlit>=1.25.0",
@@ -86,6 +87,10 @@ observability = [
 integration = [
     "testcontainers>=4.0.0",
     "redis>=5.0.0",
+]
+reliability = [
+    "tenacity>=8.2.0",
+    "apscheduler>=3.10.0",
 ]
 
 [project.urls]
@@ -141,6 +146,9 @@ module = [
     "neo4j",
     "openai",
     "grpc",
+    "tenacity",
+    "apscheduler.*",
+    "sklearn.*",
     "src.generated.*",
 ]
 ignore_missing_imports = true

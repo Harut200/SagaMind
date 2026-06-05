@@ -138,12 +138,40 @@ class MemoryConsolidator:
             return [m for m in self.db.fallback_storage if m["tenant_id"] == tenant_id]
         return []
 
-    def _cluster(self, episodes: list[Any], eps: float) -> dict[int, list[Any]]:
-        """Single-linkage connected-components grouping over the distance matrix."""
+    def _cluster(self, episodes: list[Any], eps: float, min_samples: int = 2) -> dict[int, list[Any]]:
+        """Cluster episodes via DBSCAN (cosine metric) when sklearn is available.
+
+        Falls back to connected-components when sklearn is absent so that the test
+        suite and offline demo continue to work without the dashboard extras.
+        """
         embeddings = [_embedding(ep) for ep in episodes]
+        try:
+            import numpy as np
+            from sklearn.cluster import DBSCAN
+
+            widths = {len(e) for e in embeddings}
+            if len(widths) != 1:
+                raise ValueError("ragged embeddings")
+            m = np.asarray(embeddings, dtype=float)
+            norms = np.linalg.norm(m, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            unit = m / norms
+            labels = DBSCAN(eps=eps, min_samples=min_samples, metric="cosine").fit_predict(unit)
+            clusters: dict[int, list[Any]] = {}
+            for idx, label in enumerate(labels):
+                if label == -1:
+                    continue  # noise — isolated occurrence, not a concept
+                clusters.setdefault(int(label), []).append(episodes[idx])
+            return clusters
+        except Exception:  # noqa: BLE001 - sklearn absent or ragged input → fallback
+            return self._cluster_connected_components(episodes, embeddings, eps)
+
+    def _cluster_connected_components(
+        self, episodes: list[Any], embeddings: list[Any], eps: float
+    ) -> dict[int, list[Any]]:
+        """Deterministic single-linkage fallback used when sklearn is unavailable."""
         dist = self._distance_matrix(embeddings)
         n = len(episodes)
-
         clusters: dict[int, list[Any]] = {}
         assigned: set[int] = set()
         for i in range(n):

@@ -190,11 +190,15 @@ class TimescaleMemoryStore:
 
     # ── Reads ───────────────────────────────────────────────────────────
     def retrieve_similar_memories(
-        self, tenant_id: str, query_embedding: list[float], limit: int = 5
+        self,
+        tenant_id: str,
+        query_embedding: list[float],
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """Return the *limit* most cosine-similar memories for a tenant."""
+        """Return cosine-similar memories for a tenant with pagination support."""
         if not self.pool_active:
-            return self._fallback_similarity(tenant_id, query_embedding, limit)
+            return self._fallback_similarity(tenant_id, query_embedding, limit, offset)
 
         conn = self.pool.getconn()
         memories: list[dict[str, Any]] = []
@@ -207,9 +211,9 @@ class TimescaleMemoryStore:
                     FROM episodic_memories
                     WHERE tenant_id = %s
                     ORDER BY embedding <=> %s
-                    LIMIT %s;
+                    LIMIT %s OFFSET %s;
                     """,
-                    (tenant_id, self._bind_embedding(query_embedding), limit),
+                    (tenant_id, self._bind_embedding(query_embedding), limit, offset),
                 )
                 memories = [self._row_to_dict(r) for r in cursor.fetchall()]
         except Exception as exc:  # noqa: BLE001
@@ -258,14 +262,16 @@ class TimescaleMemoryStore:
             "context_data": r[8],
         }
 
-    def _fallback_similarity(self, tenant_id: str, query_embedding: list[float], limit: int) -> list[dict[str, Any]]:
+    def _fallback_similarity(
+        self, tenant_id: str, query_embedding: list[float], limit: int, offset: int = 0
+    ) -> list[dict[str, Any]]:
         scored: list[tuple[dict[str, Any], float]] = [
             (item, _cosine_similarity(item["embedding"], query_embedding))
             for item in self.fallback_storage
             if item["tenant_id"] == tenant_id
         ]
         scored.sort(key=lambda x: x[1], reverse=True)
-        return [item for item, _ in scored[:limit]]
+        return [item for item, _ in scored[offset : offset + limit]]
 
 
 def _cosine_similarity(u: list[float], v: list[float]) -> float:

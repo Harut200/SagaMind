@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     neo4j_uri: str = "bolt://127.0.0.1:7687"
     neo4j_user: str = "neo4j"
     neo4j_pass: str = "sagamind_secure_neo_2026"
+    neo4j_timeout_s: int = 30
 
     # ── Redis ───────────────────────────────────────────────────────────
     redis_host: str = "127.0.0.1"
@@ -98,6 +99,8 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dim: int = 1536
     consolidation_model: str = "gpt-4"
+    # Cron expression for automatic sleep-cycle consolidation. Empty = disabled.
+    consolidation_cron: str = ""
 
     # ── Derived helpers ─────────────────────────────────────────────────
     @computed_field  # type: ignore[prop-decorator]
