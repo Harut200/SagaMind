@@ -118,12 +118,10 @@ module = [
     "z3",
     "wasmtime",
     "psycopg2",
-    "psycopg2.*",
     "pgvector.*",
     "neo4j",
     "openai",
     "grpc",
-    "grpc.*",
     "src.generated.*",
 ]
 ignore_missing_imports = true
