@@ -1,42 +1,51 @@
-version: '3.8'
+# SagaMind local / reference deployment.
+#
+# Secrets are sourced from a .env file (copy .env.example -> .env and set strong values).
+# This compose file ships NO default credentials: `docker compose up` fails fast if the
+# required secrets are unset, which is the intended fail-closed behaviour.
+#
+# For a writable code mount during development, add a docker-compose.override.yml
+# (git-ignored) — it is intentionally not baked into this production-leaning file.
 
 services:
-  # TimescaleDB + pgvector (Episodic memory and time-series transactional logging)
   timescaledb:
     image: timescale/timescaledb-ha:pg15
     container_name: sagamind-timescaledb
     environment:
-      - POSTGRES_DB=sagamind
-      - POSTGRES_USER=sagamind_user
-      - POSTGRES_PASSWORD=sagamind_secure_pass_2026
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME in .env}
+      POSTGRES_USER: ${DB_USER:?set DB_USER in .env}
+      POSTGRES_PASSWORD: ${DB_PASS:?set DB_PASS in .env}
     ports:
       - "5432:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sagamind_user -d sagamind"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
 
-  # Neo4j (Neocortical Semantic Knowledge Graph)
   neo4j:
     image: neo4j:5.12-community
     container_name: sagamind-neo4j
     ports:
-      - "7474:7474" # HTTP Dashboard
-      - "7687:7687" # Bolt Protocol
+      - "7474:7474"
+      - "7687:7687"
     environment:
-      - NEO4J_AUTH=neo4j/sagamind_secure_neo_2026
+      NEO4J_AUTH: ${NEO4J_USER:?set NEO4J_USER in .env}/${NEO4J_PASS:?set NEO4J_PASS in .env}
     volumes:
       - neo4j_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p sagamind_secure_neo_2026 'RETURN 1'"]
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER} -p ${NEO4J_PASS} 'RETURN 1'"]
       interval: 10s
       timeout: 10s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
 
-  # Redis (Saga transactional log cache and fast queue coordination)
   redis:
     image: redis:7.0-alpine
     container_name: sagamind-redis
@@ -49,8 +58,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
 
-  # SagaMind Core Engine service container
   sagamind-core:
     build:
       context: .
@@ -64,22 +74,32 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8000:8000" # FastAPI REST/WebSockets Gateway
-      - "50051:50051" # gRPC Engine Gateway
+      - "8000:8000"
+      - "50051:50051"
     environment:
-      - ENV=production
-      - DB_HOST=timescaledb
-      - DB_NAME=sagamind
-      - DB_USER=sagamind_user
-      - DB_PASS=sagamind_secure_pass_2026
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASS=sagamind_secure_neo_2026
-      - REDIS_HOST=redis
+      ENV: production
+      REQUIRE_BACKENDS: "true"
+      DB_HOST: timescaledb
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASS: ${NEO4J_PASS}
+      REDIS_HOST: redis
+      API_KEYS: ${API_KEYS:?set API_KEYS in .env}
+      ALLOWED_WORKSPACE_ROOT: /app/workspace
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
-      - .:/app
+      - core_workspace:/app/workspace
 
 volumes:
   timescale_data:
   neo4j_data:
   redis_data:
+  core_workspace:
