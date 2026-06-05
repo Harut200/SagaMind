@@ -6,6 +6,21 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added (durability & operations)
+- **Durable saga state** (`src/orchestrator/state_store.py`): `SagaStateStore` with
+  Postgres → Redis → in-memory backend auto-detection (`STATE_STORE_BACKEND` to pin),
+  a persisted compensation log, and `coordinator.recover()` that rolls back sagas left
+  incomplete by a crash — run automatically on API startup. Redis is now actually used.
+- **Observability** (`src/observability/`): Prometheus metrics (saga/step/compensation
+  counters + verify/step latency histograms), a public `/metrics` endpoint, and an optional
+  OpenTelemetry span helper. All degrade to no-ops when the libraries are absent.
+- **Alembic migrations** (`alembic/`) with an initial revision mirroring the schema; raw SQL
+  init (`migrations/001_init.sql`) retained for first-boot container provisioning.
+- **Integration test suite** (`tests/integration/`) gated by `RUN_INTEGRATION=1`, exercising
+  live TimescaleDB/Neo4j/Redis; skipped by default so the unit suite stays hermetic.
+- **True WASM isolation primitive** `WasmSandbox.run_wasm_module` — fuel-metered, with only
+  the workspace directory pre-opened (WASI), for executing untrusted compiled tool code.
+
 ### Fixed
 - **Critical:** TimescaleDB pool was never used — `psycopg2.pool` submodule was not
   imported, so the constructor always raised and was silently swallowed. The store now

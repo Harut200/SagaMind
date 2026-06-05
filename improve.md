@@ -25,18 +25,25 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 | 3 | Z3 verifier ignores arbitrary invariants (only `str.prefixof`/`path`) | STUB | ✅ general SMT-LIB2 refutation + timeout |
 | 4 | No API authentication / authorization / rate limiting | GAP/SEC | ✅ API key + CORS + body limit + rate limit |
 | 5 | Committed default secrets; no fail-closed in production | GAP/SEC | ✅ fail-closed config; secrets via `.env` |
-| 6 | Saga state is in-process only; lost on restart (Redis unused) | GAP | 🟡 status API + bounded retention; durable store designed, not wired |
+| 6 | Saga state is in-process only; lost on restart (Redis unused) | GAP | ✅ durable store (Postgres/Redis/memory) + compensation log + crash recovery on startup |
 | 7 | gRPC surface entirely missing despite deps/ports | STUB | ✅ proto + async server + codegen |
 | 8 | Speculative execution is an `asyncio.sleep` simulation, unwired | STUB | ✅ real parallel validation + winner-commit + endpoint + tests |
 | 9 | Consolidation: O(n^2) pure-Python clustering; LLM distill unwired | STUB/PERF | ✅ NumPy-vectorised + LLM label hook |
 | 10 | No embedding generation (OpenAI client never instantiated) | GAP | ✅ `EmbeddingService` (OpenAI + deterministic fallback) |
-| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | 🟡 CI + coverage gate + pre-commit; live-service integration tests TODO |
+| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | 🟡 CI + coverage gate + pre-commit + marker-gated integration suite; running it in CI against live services TODO |
 | 12 | `app_demo` decay path mixes naive/aware datetimes | BUG | ✅ tz-normalised + regression test |
 | 13 | Vector/decay math in pure Python — vectorize or move to a fast lang | PERF | 🟡 NumPy vectorised; Rust/ANN roadmap below |
 
-**Remaining headline work:** true sandboxed execution of untrusted tool code (WASM/microVM,
-§2.1), durable + distributed sagas (§3.6, §6), observability/metrics/tracing (§5.3), managed
-migrations (§5.4), live-service integration tests (§5.1), and the performance ladder (§4).
+**Done since the original review:** durable saga state + crash recovery (`SagaStateStore`,
+Postgres/Redis/memory) wired into `main`; Prometheus metrics + `/metrics` + optional OTel
+tracing (`src/observability`); Alembic migration scaffolding (`alembic/`); a marker-gated
+integration suite (`tests/integration`, `RUN_INTEGRATION=1`); and a genuine fuel-metered,
+directory-preopened WASI execution primitive (`WasmSandbox.run_wasm_module`).
+
+**Remaining headline work:** compiling untrusted tools to WASM / microVM so `run_wasm_module`
+is the *default* execution path for untrusted code (§2.1); **distributed** saga orchestration
+(Temporal/Celery, §6) on top of the now-durable log; running the integration suite against
+live services in CI (§5.1); and the native-code performance ladder (§4 — Rust/PyO3 + ANN).
 
 ---
 
