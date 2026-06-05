@@ -82,6 +82,7 @@ class SagaStep:
     invariants: str
     status: str = StepStatus.PENDING.value
     error: str = ""
+    idempotency_key: str | None = None
 
 
 @dataclass
