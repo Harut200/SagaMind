@@ -63,3 +63,8 @@ logs/
 timescale_data/
 neo4j_data/
 redis_data/
+
+# CLAUDE
+CLAUDE.md
+.claude/
+.claudeignore
