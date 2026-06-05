@@ -253,14 +253,16 @@ with right_col:
 
     # Calculate curves for three profiles
     for t in times:
+        now_utc = datetime.now(timezone.utc)
+        retrieved_at = now_utc - timedelta(hours=t)
         # 1. Low importance, no retrievals
-        m1 = MemoryNode("", datetime.now(), datetime.now() - timedelta(hours=t), "", "", 0.3, 0, [])
+        m1 = MemoryNode("", now_utc, retrieved_at, "", "", 0.3, 0, [])
         r1 = manager.calculate_retention(m1)
         # 2. High importance, no retrievals
-        m2 = MemoryNode("", datetime.now(), datetime.now() - timedelta(hours=t), "", "", 0.9, 0, [])
+        m2 = MemoryNode("", now_utc, retrieved_at, "", "", 0.9, 0, [])
         r2 = manager.calculate_retention(m2)
         # 3. High importance + highly reinforced
-        m3 = MemoryNode("", datetime.now(), datetime.now() - timedelta(hours=t), "", "", 0.9, 5, [])
+        m3 = MemoryNode("", now_utc, retrieved_at, "", "", 0.9, 5, [])
         r3 = manager.calculate_retention(m3)
 
         decay_data.append({"Elapsed Hours": t, "Retention Score": r1, "Memory Profile": "Low Importance (0.3), No retrievals"})
