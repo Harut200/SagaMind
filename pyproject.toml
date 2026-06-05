@@ -36,15 +36,13 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.22.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
     "z3-solver>=4.12.0",
     "numpy>=1.23.0",
-    "pandas>=1.5.0",
     "psycopg2-binary>=2.9.6",
+    "pgvector>=0.2.0",
     "neo4j>=5.8.0",
-    "grpcio>=1.54.0",
-    "grpcio-tools>=1.54.0",
-    "protobuf>=4.21.0",
 ]
 
 [project.optional-dependencies]
@@ -53,16 +51,25 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "httpx>=0.24.0",
-    "ruff>=0.1.0",
+    "ruff>=0.6.0",
     "mypy>=1.5.0",
 ]
 dashboard = [
     "streamlit>=1.25.0",
     "plotly>=5.15.0",
+    "pandas>=1.5.0",
     "scikit-learn>=1.2.0",
 ]
 wasm = [
     "wasmtime>=12.0.0",
+]
+grpc = [
+    "grpcio>=1.54.0",
+    "grpcio-tools>=1.54.0",
+    "protobuf>=4.21.0",
+]
+llm = [
+    "openai>=1.0.0",
 ]
 
 [project.urls]
@@ -75,10 +82,21 @@ Issues = "https://github.com/sagamind/sagamind/issues"
 where = ["."]
 include = ["src*"]
 
+[tool.setuptools.package-data]
+src = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/grpc_server.py", "src/generated/*"]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.ruff]
 target-version = "py310"
