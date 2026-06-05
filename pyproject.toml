@@ -110,3 +110,20 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+
+# Optional/native dependencies that may be absent in a given environment (the code
+# imports them defensively and degrades gracefully). Don't fail type-checking on them.
+[[tool.mypy.overrides]]
+module = [
+    "z3",
+    "wasmtime",
+    "psycopg2",
+    "psycopg2.*",
+    "pgvector.*",
+    "neo4j",
+    "openai",
+    "grpc",
+    "grpc.*",
+    "src.generated.*",
+]
+ignore_missing_imports = true

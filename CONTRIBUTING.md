@@ -6,8 +6,8 @@ gates, and the contribution workflow.
 ## Development setup
 
 ```bash
-git clone https://github.com/sagamind/sagamind.git
-cd sagamind
+git clone https://github.com/Harut200/SagaMind.git
+cd SagaMind
 python -m venv .venv && source .venv/bin/activate
 make dev            # installs dev + dashboard + wasm extras
 pre-commit install  # enable the local hooks
