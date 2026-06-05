@@ -23,6 +23,7 @@ import logging
 import os
 from typing import Any
 
+from src.config import settings
 from src.models import SandboxResult
 from src.security import PathSecurityError, contain_path
 
@@ -112,6 +113,41 @@ class WasmSandbox:
         if tool == "DATABASE_QUERY":
             return True
         return True
+
+    # ── True WASM isolation (for untrusted compiled tool code) ──────────
+    def run_wasm_module(
+        self, wasm_bytes: bytes, entrypoint: str = "_start", preopen_root: str | None = None
+    ) -> SandboxResult:
+        """Execute a WASI module under genuine isolation: fuel-metered, with only the
+        workspace directory pre-opened so the guest physically cannot touch anything else.
+
+        This is the path untrusted, compiled-to-WASM tools should take (vs. the host
+        reference tools above). Requires the optional ``wasmtime`` runtime.
+        """
+        if not self.engine:
+            raise SandboxError("WASM runtime unavailable (install the 'wasm' extra: wasmtime).")
+        import wasmtime
+
+        root = preopen_root or settings.allowed_workspace_root
+        store = wasmtime.Store(self.engine)
+        store.set_fuel(self.fuel_limit)
+
+        wasi = wasmtime.WasiConfig()
+        wasi.preopen_dir(root, "/")  # guest's only view of the filesystem
+        store.set_wasi(wasi)
+
+        linker = wasmtime.Linker(self.engine)
+        linker.define_wasi()
+        try:
+            module = wasmtime.Module(self.engine, wasm_bytes)
+            instance = linker.instantiate(store, module)
+            func = instance.exports(store).get(entrypoint)
+            if func is None:
+                raise SandboxError(f"WASM module has no export '{entrypoint}'.")
+            func(store)
+        except wasmtime.WasmtimeError as exc:  # includes fuel exhaustion / traps
+            raise SandboxError(f"WASM execution trapped: {exc}") from exc
+        return SandboxResult(success=True, data={"entrypoint": entrypoint, "jail": root})
 
     def _delete_file(self, args: dict[str, Any]) -> bool:
         raw_path = args.get("path")

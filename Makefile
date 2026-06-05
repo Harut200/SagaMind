@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev lint format type test cover run demo grpc proto docker clean
+.PHONY: help install dev lint format type test cover integration migrate run demo grpc proto docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -26,6 +26,12 @@ test: ## Run the test suite
 
 cover: ## Run tests with coverage gate
 	pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+
+integration: ## Run integration tests against live backends (needs docker compose up)
+	RUN_INTEGRATION=1 pytest -m integration
+
+migrate: ## Apply database migrations (needs .[migrations] and a reachable DB)
+	alembic upgrade head
 
 run: ## Start the REST API
 	python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload

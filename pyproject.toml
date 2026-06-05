@@ -71,6 +71,22 @@ grpc = [
 llm = [
     "openai>=1.0.0",
 ]
+redis = [
+    "redis>=5.0.0",
+]
+migrations = [
+    "alembic>=1.13.0",
+    "sqlalchemy>=2.0.0",
+]
+observability = [
+    "prometheus-client>=0.20.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+]
+integration = [
+    "testcontainers>=4.0.0",
+    "redis>=5.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/sagamind/sagamind"
@@ -90,6 +106,9 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
 asyncio_mode = "auto"
+markers = [
+    "integration: requires live backends (TimescaleDB/Neo4j/Redis); skipped unless RUN_INTEGRATION=1",
+]
 
 [tool.coverage.run]
 source = ["src"]
