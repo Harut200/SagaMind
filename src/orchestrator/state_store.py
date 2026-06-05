@@ -55,7 +55,7 @@ class SagaStateStore:
         # In-memory store — only written when backend == "memory".
         self._state: dict[str, dict[str, Any]] = {}
         self._comps: dict[str, list[dict[str, Any]]] = {}
-        self._idem: dict[str, set[str]] = {}      # saga_id → committed idempotency keys
+        self._idem: dict[str, set[str]] = {}  # saga_id → committed idempotency keys
         self._dead: list[dict[str, Any]] = []
 
         forced = settings.state_store_backend.lower()
@@ -102,9 +102,7 @@ class SagaStateStore:
         try:
             import redis
 
-            self._redis = redis.Redis(
-                host=settings.redis_host, port=settings.redis_port, decode_responses=True
-            )
+            self._redis = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
             self._redis.ping()
             return True
         except Exception as exc:  # noqa: BLE001 - optional backend
@@ -122,6 +120,7 @@ class SagaStateStore:
 
     def _pg_return(self, conn: Any) -> None:
         import contextlib
+
         with contextlib.suppress(Exception):
             self._pg_pool.putconn(conn)
 
@@ -197,8 +196,7 @@ class SagaStateStore:
                     )
                     seq = cur.fetchone()[0]
                     cur.execute(
-                        "INSERT INTO saga_compensations (saga_id, seq, tool_name, arguments) "
-                        "VALUES (%s, %s, %s, %s);",
+                        "INSERT INTO saga_compensations (saga_id, seq, tool_name, arguments) VALUES (%s, %s, %s, %s);",
                         (saga_id, seq, tool_name, json.dumps(arguments)),
                     )
             finally:
@@ -209,9 +207,7 @@ class SagaStateStore:
                 json.dumps({"tool_name": tool_name, "arguments": arguments}),
             )
         else:
-            self._comps.setdefault(saga_id, []).append(
-                {"tool_name": tool_name, "arguments": arguments}
-            )
+            self._comps.setdefault(saga_id, []).append({"tool_name": tool_name, "arguments": arguments})
 
     def _pg_write_state(self, saga_id: str, status: str, metadata: dict[str, Any]) -> None:
         conn = self._pg_conn()
@@ -356,8 +352,7 @@ class SagaStateStore:
                 saga_ids = [str(r[0]) for r in cur.fetchall()]
                 for sid in saga_ids:
                     cur.execute(
-                        "SELECT tool_name, arguments FROM saga_compensations "
-                        "WHERE saga_id = %s ORDER BY seq;",
+                        "SELECT tool_name, arguments FROM saga_compensations WHERE saga_id = %s ORDER BY seq;",
                         (sid,),
                     )
                     comps = [{"tool_name": r[0], "arguments": r[1]} for r in cur.fetchall()]
@@ -369,9 +364,7 @@ class SagaStateStore:
     def _redis_list_incomplete(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for sid in self._redis.smembers("sagas:incomplete"):
-            comps = [
-                json.loads(c) for c in self._redis.lrange(f"saga:{sid}:comps", 0, -1)
-            ]
+            comps = [json.loads(c) for c in self._redis.lrange(f"saga:{sid}:comps", 0, -1)]
             out.append({"saga_id": sid, "compensations": comps})
         return out
 

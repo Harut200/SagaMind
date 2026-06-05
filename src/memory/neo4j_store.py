@@ -41,6 +41,7 @@ try:
         )(fn)
 
 except ImportError:
+
     def _neo4j_retry(fn: Any) -> Any:  # type: ignore[misc]
         return fn
 
@@ -72,25 +73,22 @@ class Neo4jGraphStore:
 
     def _handle_unavailable(self, reason: str, exc: Exception) -> None:
         if settings.require_backends:
-            raise RuntimeError(
-                f"REQUIRE_BACKENDS is set but Neo4j is unavailable: {reason}: {exc}"
-            ) from exc
+            raise RuntimeError(f"REQUIRE_BACKENDS is set but Neo4j is unavailable: {reason}: {exc}") from exc
         logger.warning("%s. Using in-memory graph simulator. (%s)", reason, exc)
 
     # ── Writes ──────────────────────────────────────────────────────────
-    def upsert_relationship(
-        self, source: str, relation: str, target: str, weight: float = 0.5
-    ) -> None:
+    def upsert_relationship(self, source: str, relation: str, target: str, weight: float = 0.5) -> None:
         """Merge two concept nodes and a weighted relationship between them."""
         if not self.active:
             self.fallback_nodes[source] = {"name": source, "type": "Concept"}
             self.fallback_nodes[target] = {"name": target, "type": "Concept"}
-            self.fallback_relationships.append(
-                {"source": source, "target": target, "type": relation, "weight": weight}
-            )
+            self.fallback_relationships.append({"source": source, "target": target, "type": relation, "weight": weight})
             logger.info(
                 "[In-Memory Graph] Upserted: (%s)-[%s {weight: %s}]->(%s)",
-                source, relation, weight, target,
+                source,
+                relation,
+                weight,
+                target,
             )
             return
 
@@ -105,7 +103,10 @@ class Neo4jGraphStore:
                     ON CREATE SET r.weight = $weight
                     ON MATCH SET r.weight = $weight + (1.0 - r.weight) * 0.1;
                     """,
-                    source=source, target=target, relation=relation, weight=weight,
+                    source=source,
+                    target=target,
+                    relation=relation,
+                    weight=weight,
                 )
 
         try:

@@ -81,9 +81,7 @@ def _make_coordinator(steps_fail: list[bool], comp_fails: list[bool]) -> SagaTra
     comp_mask=st.integers(min_value=0, max_value=63),
 )
 @h_settings(max_examples=200, deadline=2000)
-def test_saga_always_reaches_terminal_state(
-    step_count: int, fail_mask: int, comp_mask: int
-) -> None:
+def test_saga_always_reaches_terminal_state(step_count: int, fail_mask: int, comp_mask: int) -> None:
     """For any combination of step/compensation failures the saga must end in a terminal state."""
     steps_fail = [(fail_mask >> i) & 1 == 1 for i in range(step_count)]
     comp_fails = [(comp_mask >> i) & 1 == 1 for i in range(step_count)]
@@ -207,8 +205,6 @@ def test_contain_path_result_always_inside_root(segments: list[str]) -> None:
         try:
             result = contain_path(candidate, root=root)
             assert os.path.isabs(result)
-            assert os.path.commonpath([root, result]) == root, (
-                f"contain_path returned {result!r} escaping {root!r}"
-            )
+            assert os.path.commonpath([root, result]) == root, f"contain_path returned {result!r} escaping {root!r}"
         except PathSecurityError:
             pass  # rejection is always acceptable

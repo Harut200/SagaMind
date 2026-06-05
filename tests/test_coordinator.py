@@ -65,6 +65,7 @@ class TestExecuteSagaSuccess:
         import pytest
 
         from src.orchestrator.coordinator import CoordinatorError
+
         with pytest.raises(CoordinatorError, match="not found"):
             coordinator.execute_saga("saga-unknown", sample_steps)
 

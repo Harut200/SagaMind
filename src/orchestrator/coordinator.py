@@ -76,14 +76,10 @@ class SagaTransactionCoordinator:
         for saga in self.db.list_incomplete():
             saga_id = saga["saga_id"]
             comps = saga.get("compensations", [])
-            logger.warning(
-                "[RECOVERY] Compensating %d step(s) for incomplete saga %s", len(comps), saga_id
-            )
+            logger.warning("[RECOVERY] Compensating %d step(s) for incomplete saga %s", len(comps), saga_id)
             for comp in reversed(comps):
                 try:
-                    self.sandbox.execute_compensation(
-                        ActionPayload(comp["tool_name"], comp.get("arguments", {}))
-                    )
+                    self.sandbox.execute_compensation(ActionPayload(comp["tool_name"], comp.get("arguments", {})))
                 except Exception as exc:  # noqa: BLE001 - best-effort recovery
                     logger.error("[RECOVERY] Compensation failed for saga %s: %s", saga_id, exc)
             self.db.write_transaction_state(saga_id, SagaStatus.ROLLED_BACK.value, {"recovered": True})
@@ -121,12 +117,12 @@ class SagaTransactionCoordinator:
         metrics.inc("sagas_started")
         logger.info(
             "[SAGA-%s] Transaction initialized for tenant '%s'. Goal: '%s'",
-            saga_id, tenant_id, goal,
+            saga_id,
+            tenant_id,
+            goal,
         )
         if self.db:
-            self.db.write_transaction_state(
-                saga_id, SagaStatus.RUNNING.value, {"goal": goal, "tenant_id": tenant_id}
-            )
+            self.db.write_transaction_state(saga_id, SagaStatus.RUNNING.value, {"goal": goal, "tenant_id": tenant_id})
 
     # ── Execution ────────────────────────────────────────────────────────
     def execute_saga(
@@ -143,20 +139,24 @@ class SagaTransactionCoordinator:
         Returns True on full commit, False when a rollback occurred.
         """
         if saga_id not in self.active_sagas:
-            raise CoordinatorError(
-                f"Saga '{saga_id}' not found. Call start_transaction_log first."
-            )
+            raise CoordinatorError(f"Saga '{saga_id}' not found. Call start_transaction_log first.")
 
         saga = self.active_sagas[saga_id]
         completed = saga.completed_steps
 
         for step in steps:
             # ── Idempotency check ────────────────────────────────────────
-            if (step.idempotency_key and self.db and hasattr(self.db, "step_already_committed")
-                    and self.db.step_already_committed(saga_id, step.idempotency_key)):
+            if (
+                step.idempotency_key
+                and self.db
+                and hasattr(self.db, "step_already_committed")
+                and self.db.step_already_committed(saga_id, step.idempotency_key)
+            ):
                 logger.info(
                     "[SAGA-%s] Step '%s' already committed (idempotency_key=%s). Skipping.",
-                    saga_id, step.step_name, step.idempotency_key,
+                    saga_id,
+                    step.step_name,
+                    step.idempotency_key,
                 )
                 step.status = StepStatus.COMMITTED.value
                 completed.append(step)
@@ -177,7 +177,9 @@ class SagaTransactionCoordinator:
                     step.error = f"Logic Solver check failed: {explanation}"
                     logger.error(
                         "[SAGA-%s] Invariant violation at step '%s': %s",
-                        saga_id, step.step_name, explanation,
+                        saga_id,
+                        step.step_name,
+                        explanation,
                     )
                     if callback:
                         callback(step, StepStatus.FAILED.value, step.error)
@@ -192,15 +194,11 @@ class SagaTransactionCoordinator:
 
                 # Persist compensation + idempotency record
                 if self.db and hasattr(self.db, "append_compensation"):
-                    self.db.append_compensation(
-                        saga_id, step.compensation.tool_name, step.compensation.arguments
-                    )
+                    self.db.append_compensation(saga_id, step.compensation.tool_name, step.compensation.arguments)
                 if step.idempotency_key and self.db and hasattr(self.db, "mark_step_committed"):
                     self.db.mark_step_committed(saga_id, step.idempotency_key)
 
-                logger.info(
-                    "[SAGA-%s] Step '%s' executed and committed successfully.", saga_id, step.step_name
-                )
+                logger.info("[SAGA-%s] Step '%s' executed and committed successfully.", saga_id, step.step_name)
                 if callback:
                     callback(step, StepStatus.COMMITTED.value, "")
 
@@ -208,7 +206,10 @@ class SagaTransactionCoordinator:
                 step.status = StepStatus.FAILED.value
                 step.error = f"Runtime Execution Exception: {e!s}"
                 logger.error(
-                    "[SAGA-%s] Exception at step '%s': %s", saga_id, step.step_name, step.error,
+                    "[SAGA-%s] Exception at step '%s': %s",
+                    saga_id,
+                    step.step_name,
+                    step.error,
                     exc_info=True,
                 )
                 if callback:
@@ -232,9 +233,7 @@ class SagaTransactionCoordinator:
         callback: Callable[[Any, str, str], None] | None = None,
     ) -> None:
         """Execute compensations in LIFO order. Guarantees eventual consistency."""
-        logger.warning(
-            "[SAGA-%s] Initiating rollback for %d completed step(s).", saga_id, len(completed_steps)
-        )
+        logger.warning("[SAGA-%s] Initiating rollback for %d completed step(s).", saga_id, len(completed_steps))
         if self.db:
             self.db.write_transaction_state(saga_id, SagaStatus.COMPENSATING.value, {})
 
@@ -276,7 +275,9 @@ class SagaTransactionCoordinator:
         metrics.inc("compensations_failed")
         logger.error(
             "[SAGA-%s] [CRITICAL] Compensation failed for step '%s': %s — system may be inconsistent.",
-            saga_id, step.step_name, error,
+            saga_id,
+            step.step_name,
+            error,
         )
         if callback:
             callback(step, StepStatus.COMPENSATION_FAILED.value, error)
