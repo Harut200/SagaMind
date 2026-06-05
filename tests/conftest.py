@@ -17,6 +17,7 @@ from src.orchestrator.coordinator import SagaTransactionCoordinator
 # Verifier Fixtures
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_verifier():
     """Z3Verifier-like object where verify() always passes."""
@@ -37,6 +38,7 @@ def failing_verifier():
 # Sandbox Fixture
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_sandbox():
     """WasmSandbox-like object with successful execute/compensation."""
@@ -50,6 +52,7 @@ def mock_sandbox():
 # Coordinator Fixture
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def coordinator(mock_verifier, mock_sandbox):
     """Fully wired SagaTransactionCoordinator with mocked dependencies."""
@@ -59,6 +62,7 @@ def coordinator(mock_verifier, mock_sandbox):
 # ─────────────────────────────────────────────────────────────────────
 # Sample Domain Objects
 # ─────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def sample_steps():

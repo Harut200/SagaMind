@@ -39,7 +39,7 @@ class MemoryConsolidator:
     def __init__(self, timescale_store: Any, neo4j_store: Any, llm_client: Any | None = None):
         self.db = timescale_store
         self.graph = neo4j_store
-        self.llm = llm_client
+        self.llm: Any = llm_client
 
     # ── Distance ────────────────────────────────────────────────────────
     def compute_cosine_distance(self, u: list[float], v: list[float]) -> float:
@@ -73,10 +73,7 @@ class MemoryConsolidator:
                 dist[:, zero] = 1.0
             return dist
         except Exception:  # noqa: BLE001 - NumPy missing or ragged input
-            return [
-                [self.compute_cosine_distance(embeddings[i], embeddings[j]) for j in range(n)]
-                for i in range(n)
-            ]
+            return [[self.compute_cosine_distance(embeddings[i], embeddings[j]) for j in range(n)] for i in range(n)]
 
     # ── Cluster labelling ───────────────────────────────────────────────
     def _label_cluster(self, cluster_id: int, cluster: list[Any]) -> str:
@@ -93,10 +90,7 @@ class MemoryConsolidator:
     def _llm_summarize(self, summaries: list[str]) -> str:
         """Override-point / thin wrapper around the configured LLM client."""
         joined = "\n- ".join(summaries)
-        prompt = (
-            "Summarise the shared concept behind these agent experiences in a short "
-            f"noun phrase:\n- {joined}"
-        )
+        prompt = f"Summarise the shared concept behind these agent experiences in a short noun phrase:\n- {joined}"
         return self.llm.summarize(prompt)  # type: ignore[no-any-return]
 
     # ── Main cycle ──────────────────────────────────────────────────────
@@ -138,7 +132,8 @@ class MemoryConsolidator:
     # ── Internals ───────────────────────────────────────────────────────
     def _fetch_episodes(self, tenant_id: str) -> list[Any]:
         if hasattr(self.db, "get_all_memories"):
-            return self.db.get_all_memories(tenant_id)
+            episodes: list[Any] = self.db.get_all_memories(tenant_id)
+            return episodes
         if hasattr(self.db, "fallback_storage"):
             return [m for m in self.db.fallback_storage if m["tenant_id"] == tenant_id]
         return []

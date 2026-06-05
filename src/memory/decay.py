@@ -25,7 +25,8 @@ def _as_aware_utc(value: Any) -> datetime:
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+    aware: datetime = value.astimezone(timezone.utc)
+    return aware
 
 
 def _attr(obj: Any, name: str, default: Any = None) -> Any:
@@ -42,8 +43,8 @@ class EbbinghausMemoryManager:
 
     def __init__(self, s_init: float = 12.0, tau: float = 0.15, gamma: float = 0.45):
         self.s_init = s_init  # Base half-life in hours
-        self.tau = tau        # Retention threshold below which a memory is evicted
-        self.gamma = gamma    # Reinforcement scaling factor
+        self.tau = tau  # Retention threshold below which a memory is evicted
+        self.gamma = gamma  # Reinforcement scaling factor
 
     def _strength(self, importance: float, n_access: int) -> float:
         return self.s_init * (1.0 + self.gamma * math.log1p(max(n_access, 0))) * importance
@@ -91,10 +92,7 @@ class EbbinghausMemoryManager:
 
         now = datetime.now(timezone.utc)
         deltas = np.array(
-            [
-                max((now - _as_aware_utc(_attr(m, "last_retrieved_at"))).total_seconds() / 3600.0, 0.0)
-                for m in memories
-            ],
+            [max((now - _as_aware_utc(_attr(m, "last_retrieved_at"))).total_seconds() / 3600.0, 0.0) for m in memories],
             dtype=float,
         )
         importance = np.array([float(_attr(m, "importance_score", 0.5)) for m in memories], dtype=float)

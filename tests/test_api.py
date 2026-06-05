@@ -16,6 +16,7 @@ import pytest
 # This prevents TimescaleDB, Neo4j, and wasmtime connections at import time.
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def client():
     """
@@ -50,15 +51,18 @@ def client():
         import importlib
 
         import src.main
+
         importlib.reload(src.main)
 
         from fastapi.testclient import TestClient
+
         yield TestClient(src.main.app)
 
 
 # ─────────────────────────────────────────────────────────────────────
 # Health Endpoint
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestHealthEndpoint:
     """Validate the /health readiness probe."""
@@ -80,6 +84,7 @@ class TestHealthEndpoint:
 # ─────────────────────────────────────────────────────────────────────
 # Start Saga Endpoint
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestStartSagaEndpoint:
     """Validate POST /saga/start creates a new saga."""
@@ -113,6 +118,7 @@ class TestStartSagaEndpoint:
 # ─────────────────────────────────────────────────────────────────────
 # 404 on Unknown Routes
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestUnknownRoutes:
     """Verify that non-existent routes return proper errors."""

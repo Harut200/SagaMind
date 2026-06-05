@@ -28,7 +28,7 @@ from src.verifier.z3_prover import Z3Verifier
 logger = get_logger("SagaMind.gRPC")
 
 _CODEGEN_HINT = (
-    "gRPC stubs not found. Run `pip install -e \".[grpc]\"` then `./scripts/gen_proto.sh` "
+    'gRPC stubs not found. Run `pip install -e ".[grpc]"` then `./scripts/gen_proto.sh` '
     "to generate src/generated/sagamind_pb2*.py."
 )
 
@@ -47,12 +47,12 @@ def build_servicer(coordinator: SagaTransactionCoordinator) -> Any:
     import uuid
 
     class SagaMindServicer(pb2_grpc.SagaMindServicer):  # type: ignore[misc, name-defined]
-        def StartSaga(self, request: Any, context: Any) -> Any:
+        def StartSaga(self, request: Any, context: Any) -> Any:  # noqa: N802 - gRPC RPC name
             saga_id = str(uuid.uuid4())
             coordinator.start_transaction_log(saga_id, request.goal, request.tenant_id)
             return pb2.StartSagaResponse(saga_id=saga_id, status="RUNNING")
 
-        def SubmitStep(self, request: Any, context: Any) -> Any:
+        def SubmitStep(self, request: Any, context: Any) -> Any:  # noqa: N802 - gRPC RPC name
             step = _proposal_to_step(pb2, request)
             ok = coordinator.execute_saga(request.saga_id, [step])
             return pb2.StepResult(
@@ -61,7 +61,7 @@ def build_servicer(coordinator: SagaTransactionCoordinator) -> Any:
                 error=step.error,
             )
 
-        def GetSagaStatus(self, request: Any, context: Any) -> Any:
+        def GetSagaStatus(self, request: Any, context: Any) -> Any:  # noqa: N802 - gRPC RPC name
             state = coordinator.get_saga_status(request.saga_id)
             if state is None:
                 context.set_code(__import__("grpc").StatusCode.NOT_FOUND)
@@ -75,14 +75,12 @@ def build_servicer(coordinator: SagaTransactionCoordinator) -> Any:
                 completed_steps=state["completed_steps"],
             )
 
-        def StreamSteps(self, request: Any, context: Any) -> Any:
+        def StreamSteps(self, request: Any, context: Any) -> Any:  # noqa: N802 - gRPC RPC name
             step = _proposal_to_step(pb2, request)
             events: list[Any] = []
 
             def emit(s: SagaStep, st: str, err: str) -> None:
-                events.append(
-                    pb2.StepEvent(step_name=s.step_name, status=st, error=err, timestamp=time.time())
-                )
+                events.append(pb2.StepEvent(step_name=s.step_name, status=st, error=err, timestamp=time.time()))
 
             coordinator.execute_saga(request.saga_id, [step], callback=emit)
             yield from events

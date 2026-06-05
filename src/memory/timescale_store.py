@@ -38,13 +38,12 @@ class TimescaleMemoryStore:
     """Episodic memory manager interfacing with TimescaleDB + pgvector."""
 
     def __init__(self) -> None:
-        self.pool: Any | None = None
+        self.pool: Any = None
         self.pool_active = False
         self._vector_registered = False
         self.fallback_storage: list[dict[str, Any]] = []
 
         try:
-            import psycopg2
             from psycopg2 import pool as pg_pool
 
             self.pool = pg_pool.SimpleConnectionPool(
@@ -68,16 +67,12 @@ class TimescaleMemoryStore:
     # ── Availability handling ───────────────────────────────────────────
     def _handle_unavailable(self, reason: str, exc: Exception) -> None:
         if settings.require_backends:
-            raise RuntimeError(
-                f"REQUIRE_BACKENDS is set but TimescaleDB is unavailable: {reason}: {exc}"
-            ) from exc
+            raise RuntimeError(f"REQUIRE_BACKENDS is set but TimescaleDB is unavailable: {reason}: {exc}") from exc
         logger.warning("%s. Using in-memory episodic store. (%s)", reason, exc)
 
     def _register_vector_adapter(self) -> None:
         """Register the pgvector type adapter so list embeddings bind correctly."""
         try:
-            import psycopg2
-
             from pgvector.psycopg2 import register_vector
 
             conn = self.pool.getconn()
@@ -115,10 +110,7 @@ class TimescaleMemoryStore:
                     );
                     """
                 )
-                cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_episodic_tenant "
-                    "ON episodic_memories (tenant_id);"
-                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_episodic_tenant ON episodic_memories (tenant_id);")
                 # Approximate-nearest-neighbour index for cosine similarity search.
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_episodic_embedding "
@@ -266,9 +258,7 @@ class TimescaleMemoryStore:
             "context_data": r[8],
         }
 
-    def _fallback_similarity(
-        self, tenant_id: str, query_embedding: list[float], limit: int
-    ) -> list[dict[str, Any]]:
+    def _fallback_similarity(self, tenant_id: str, query_embedding: list[float], limit: int) -> list[dict[str, Any]]:
         scored: list[tuple[dict[str, Any], float]] = [
             (item, _cosine_similarity(item["embedding"], query_embedding))
             for item in self.fallback_storage

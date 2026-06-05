@@ -56,9 +56,6 @@ class EmbeddingService:
         while len(raw) < self.dim * 2:
             raw.extend(hashlib.sha256(seed + counter.to_bytes(4, "big")).digest())
             counter += 1
-        values = [
-            (int.from_bytes(raw[i : i + 2], "big") / 65535.0) - 0.5
-            for i in range(0, self.dim * 2, 2)
-        ]
+        values = [(int.from_bytes(raw[i : i + 2], "big") / 65535.0) - 0.5 for i in range(0, self.dim * 2, 2)]
         norm = sum(v * v for v in values) ** 0.5 or 1.0
         return [v / norm for v in values]

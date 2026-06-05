@@ -42,7 +42,8 @@ class SpeculativeOrchestrator:
             sandbox_id = f"sb-{uuid.uuid4().hex[:6]}"
             logger.info(
                 "[Speculative] Validating draft '%s' in sandbox '%s'.",
-                draft.get("command"), sandbox_id,
+                draft.get("command"),
+                sandbox_id,
             )
             tasks.append(self.execute_draft_async(sandbox_id, draft))
         return await asyncio.gather(*tasks)
@@ -82,10 +83,9 @@ class SpeculativeOrchestrator:
     def select_and_commit(self, results: list[dict[str, Any]]) -> str | None:
         """Commit the first successful draft and discard the rest. Returns its id."""
         for result in results:
-            if result.get("success"):
-                if self.commit_sandbox_state(result["sandbox_id"]):
-                    self._discard_others(result["sandbox_id"])
-                    return result["sandbox_id"]
+            if result.get("success") and self.commit_sandbox_state(result["sandbox_id"]):
+                self._discard_others(result["sandbox_id"])
+                return result["sandbox_id"]
         return None
 
     def commit_sandbox_state(self, sandbox_id: str) -> bool:

@@ -15,6 +15,7 @@ from src.models import ActionPayload, SagaStep
 # Transaction Initialization
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestStartTransaction:
     """Validate start_transaction_log creates the correct saga entry."""
 
@@ -40,6 +41,7 @@ class TestStartTransaction:
 # ─────────────────────────────────────────────────────────────────────
 # Successful Execution
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestExecuteSagaSuccess:
     """Validate that all steps commit when verifier and sandbox both pass."""
@@ -69,12 +71,11 @@ class TestExecuteSagaSuccess:
 # Rollback on Verification Failure
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestRollbackOnVerificationFailure:
     """Validate LIFO compensations when the verifier rejects a step."""
 
-    def test_execute_saga_rollback_on_verification_failure(
-        self, failing_verifier, mock_sandbox
-    ):
+    def test_execute_saga_rollback_on_verification_failure(self, failing_verifier, mock_sandbox):
         from src.orchestrator.coordinator import SagaTransactionCoordinator
 
         coord = SagaTransactionCoordinator(failing_verifier, mock_sandbox)
@@ -82,7 +83,8 @@ class TestRollbackOnVerificationFailure:
 
         steps = [
             SagaStep(
-                step_id="s1", step_name="step-1",
+                step_id="s1",
+                step_name="step-1",
                 action=ActionPayload(tool_name="T", arguments={}),
                 compensation=ActionPayload(tool_name="C", arguments={}),
                 invariants="x",
@@ -105,9 +107,7 @@ class TestRollbackOnVerificationFailure:
 
         verifier = MagicMock()
         # First two calls pass, third fails
-        verifier.verify = MagicMock(
-            side_effect=[(True, "OK"), (True, "OK"), (False, "Violation")]
-        )
+        verifier.verify = MagicMock(side_effect=[(True, "OK"), (True, "OK"), (False, "Violation")])
 
         def track_compensation(comp):
             call_order.append(comp.tool_name)
@@ -120,7 +120,8 @@ class TestRollbackOnVerificationFailure:
 
         steps = [
             SagaStep(
-                step_id=f"s{i}", step_name=f"step-{i}",
+                step_id=f"s{i}",
+                step_name=f"step-{i}",
                 action=ActionPayload(tool_name=f"T{i}", arguments={}),
                 compensation=ActionPayload(tool_name=f"C{i}", arguments={}),
                 invariants="x",
@@ -138,31 +139,30 @@ class TestRollbackOnVerificationFailure:
 # Rollback on Execution Exception
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestRollbackOnExecutionException:
     """Validate compensations fire when the sandbox raises an exception."""
 
-    def test_execute_saga_rollback_on_execution_exception(
-        self, mock_verifier, mock_sandbox
-    ):
+    def test_execute_saga_rollback_on_execution_exception(self, mock_verifier, mock_sandbox):
         from src.orchestrator.coordinator import SagaTransactionCoordinator
 
         # First execute succeeds, second raises
-        mock_sandbox.execute = MagicMock(
-            side_effect=[{"status": "SUCCESS"}, RuntimeError("disk full")]
-        )
+        mock_sandbox.execute = MagicMock(side_effect=[{"status": "SUCCESS"}, RuntimeError("disk full")])
 
         coord = SagaTransactionCoordinator(mock_verifier, mock_sandbox)
         coord.start_transaction_log("saga-exc", "exc test", "t1")
 
         steps = [
             SagaStep(
-                step_id="s1", step_name="step-1",
+                step_id="s1",
+                step_name="step-1",
                 action=ActionPayload(tool_name="T1", arguments={}),
                 compensation=ActionPayload(tool_name="C1", arguments={}),
                 invariants="",
             ),
             SagaStep(
-                step_id="s2", step_name="step-2",
+                step_id="s2",
+                step_name="step-2",
                 action=ActionPayload(tool_name="T2", arguments={}),
                 compensation=ActionPayload(tool_name="C2", arguments={}),
                 invariants="",
@@ -176,16 +176,15 @@ class TestRollbackOnExecutionException:
         # Compensation for step-1 (the only committed step) should have fired
         mock_sandbox.execute_compensation.assert_called_once()
 
-    def test_exception_step_records_error_message(
-        self, mock_verifier, mock_sandbox
-    ):
+    def test_exception_step_records_error_message(self, mock_verifier, mock_sandbox):
         from src.orchestrator.coordinator import SagaTransactionCoordinator
 
         mock_sandbox.execute = MagicMock(side_effect=ValueError("bad input"))
 
         coord = SagaTransactionCoordinator(mock_verifier, mock_sandbox)
         step = SagaStep(
-            step_id="s1", step_name="step-1",
+            step_id="s1",
+            step_name="step-1",
             action=ActionPayload(tool_name="T", arguments={}),
             compensation=ActionPayload(tool_name="C", arguments={}),
             invariants="",
@@ -199,6 +198,7 @@ class TestRollbackOnExecutionException:
 # ─────────────────────────────────────────────────────────────────────
 # Compensation Failure Handling
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestCompensationFailure:
     """Validate behaviour when sandbox.execute_compensation returns False."""
@@ -216,13 +216,15 @@ class TestCompensationFailure:
 
         steps = [
             SagaStep(
-                step_id="s1", step_name="step-1",
+                step_id="s1",
+                step_name="step-1",
                 action=ActionPayload(tool_name="T1", arguments={}),
                 compensation=ActionPayload(tool_name="C1", arguments={}),
                 invariants="x",
             ),
             SagaStep(
-                step_id="s2", step_name="step-2",
+                step_id="s2",
+                step_name="step-2",
                 action=ActionPayload(tool_name="T2", arguments={}),
                 compensation=ActionPayload(tool_name="C2", arguments={}),
                 invariants="x",
@@ -240,22 +242,22 @@ class TestCompensationFailure:
 
         verifier = MagicMock()
         verifier.verify = MagicMock(side_effect=[(True, "OK"), (False, "bad")])
-        mock_sandbox.execute_compensation = MagicMock(
-            side_effect=RuntimeError("compensation boom")
-        )
+        mock_sandbox.execute_compensation = MagicMock(side_effect=RuntimeError("compensation boom"))
 
         coord = SagaTransactionCoordinator(verifier, mock_sandbox)
         coord.start_transaction_log("saga-ce", "comp exc", "t1")
 
         steps = [
             SagaStep(
-                step_id="s1", step_name="step-1",
+                step_id="s1",
+                step_name="step-1",
                 action=ActionPayload(tool_name="T1", arguments={}),
                 compensation=ActionPayload(tool_name="C1", arguments={}),
                 invariants="x",
             ),
             SagaStep(
-                step_id="s2", step_name="step-2",
+                step_id="s2",
+                step_name="step-2",
                 action=ActionPayload(tool_name="T2", arguments={}),
                 compensation=ActionPayload(tool_name="C2", arguments={}),
                 invariants="x",
@@ -270,6 +272,7 @@ class TestCompensationFailure:
 # ─────────────────────────────────────────────────────────────────────
 # Callback Invocation
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestCallbackInvocation:
     """Validate that the optional callback receives correct lifecycle events."""
@@ -297,7 +300,8 @@ class TestCallbackInvocation:
         coord.start_transaction_log("saga-cbf", "fail cb", "t1")
 
         step = SagaStep(
-            step_id="s1", step_name="step-1",
+            step_id="s1",
+            step_name="step-1",
             action=ActionPayload(tool_name="T", arguments={}),
             compensation=ActionPayload(tool_name="C", arguments={}),
             invariants="x",
@@ -314,7 +318,8 @@ class TestCallbackInvocation:
         """The first argument to the callback is always the SagaStep itself."""
         cb = MagicMock()
         step = SagaStep(
-            step_id="s1", step_name="tracked",
+            step_id="s1",
+            step_name="tracked",
             action=ActionPayload(tool_name="T", arguments={}),
             compensation=ActionPayload(tool_name="C", arguments={}),
             invariants="",

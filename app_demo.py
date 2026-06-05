@@ -25,15 +25,11 @@ from src.orchestrator.sandbox import WasmSandbox
 from src.verifier.z3_prover import Z3Verifier
 
 # Set page config with premium styling
-st.set_page_config(
-    page_title="SagaMind Control Center",
-    page_icon="",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="SagaMind Control Center", page_icon="", layout="wide", initial_sidebar_state="expanded")
 
 # Custom CSS for modern glassmorphic look and font settings
-st.markdown("""
+st.markdown(
+    """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap');
 
@@ -73,11 +69,16 @@ st.markdown("""
         display: inline-block;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # App Title & Header
 st.markdown("<h1 class='main-title'>SagaMind</h1>", unsafe_allow_html=True)
-st.markdown("<p class='tagline'>Transaction-Safe Multi-Agent Runtime & Episodic Memory Co-Processor</p>", unsafe_allow_html=True)
+st.markdown(
+    "<p class='tagline'>Transaction-Safe Multi-Agent Runtime & Episodic Memory Co-Processor</p>",
+    unsafe_allow_html=True,
+)
 
 # Initialize Session States
 if "logs" not in st.session_state:
@@ -95,7 +96,7 @@ if "memory_bank" not in st.session_state:
             summary="Refactored database pool size and connections limit to 20.",
             importance_score=0.9,
             retrieval_count=4,
-            embedding=[0.85, 0.15, 0.0]
+            embedding=[0.85, 0.15, 0.0],
         ),
         MemoryNode(
             memory_id="m-102",
@@ -105,7 +106,7 @@ if "memory_bank" not in st.session_state:
             summary="Identified path traversal vulnerability in files read controller.",
             importance_score=1.0,
             retrieval_count=8,
-            embedding=[0.1, 0.9, 0.0]
+            embedding=[0.1, 0.9, 0.0],
         ),
         MemoryNode(
             memory_id="m-103",
@@ -115,8 +116,8 @@ if "memory_bank" not in st.session_state:
             summary="Initialized backup Kubernetes state deployment specifications.",
             importance_score=0.4,
             retrieval_count=0,
-            embedding=[0.0, 0.1, 0.9]
-        )
+            embedding=[0.0, 0.1, 0.9],
+        ),
     ]
 
 # Sidebar configuration controls
@@ -129,26 +130,35 @@ st.sidebar.info("Use this control center to simulate LLM transactions, safety in
 # Build 3 column metric display
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class='metric-card'>
         <p style='margin:0;color:#718096;font-size:0.9rem;'>Active Transaction State</p>
         <h2 style='margin:5px 0 0 0;color:#4D96FF;'>{st.session_state.saga_status}</h2>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 with col2:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class='metric-card'>
         <p style='margin:0;color:#718096;font-size:0.9rem;'>Saga Memory Nodes</p>
         <h2 style='margin:5px 0 0 0;color:#50E3C2;'>{len(st.session_state.memory_bank)} Active Traces</h2>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 with col3:
-    st.markdown("""
+    st.markdown(
+        """
     <div class='metric-card'>
         <p style='margin:0;color:#718096;font-size:0.9rem;'>Z3 Symbolic Gate Status</p>
         <h2 style='margin:5px 0 0 0;color:#FF9F1C;'>Active (Enforcing)</h2>
     </div>
-    """.format(), unsafe_allow_html=True)
+    """.format(),
+        unsafe_allow_html=True,
+    )
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -162,7 +172,7 @@ with left_col:
     # Preset scenarios
     scenario = st.selectbox(
         "Choose Agent Execution Scenario:",
-        ["Scenario A: Safe Code Rewrite (Expect Success)", "Scenario B: Path Traversal Exploit (Expect Saga Rollback)"]
+        ["Scenario A: Safe Code Rewrite (Expect Success)", "Scenario B: Path Traversal Exploit (Expect Saga Rollback)"],
     )
 
     if st.button("Trigger Simulation"):
@@ -180,44 +190,52 @@ with left_col:
                 SagaStep(
                     step_id="1",
                     step_name="Create Setup Script",
-                    action=ActionPayload("WRITE_FILE", {"path": "/Users/Harutyun/Desktop/Portfolio1/setup.py", "content": "print('init')"}),
+                    action=ActionPayload(
+                        "WRITE_FILE",
+                        {"path": "/Users/Harutyun/Desktop/Portfolio1/setup.py", "content": "print('init')"},
+                    ),
                     compensation=ActionPayload("DELETE_FILE", {"path": "/Users/Harutyun/Desktop/Portfolio1/setup.py"}),
-                    invariants=path_invariant
+                    invariants=path_invariant,
                 ),
                 SagaStep(
                     step_id="2",
                     step_name="Initialize Config Database",
                     action=ActionPayload("DATABASE_QUERY", {"query": "CREATE TABLE settings (id INT)"}),
                     compensation=ActionPayload("DATABASE_QUERY", {"query": "DROP TABLE settings"}),
-                    invariants=path_invariant
-                )
+                    invariants=path_invariant,
+                ),
             ]
         else:
             steps = [
                 SagaStep(
                     step_id="1",
                     step_name="Create App Code",
-                    action=ActionPayload("WRITE_FILE", {"path": "/Users/Harutyun/Desktop/Portfolio1/main.py", "content": "# App code"}),
+                    action=ActionPayload(
+                        "WRITE_FILE",
+                        {"path": "/Users/Harutyun/Desktop/Portfolio1/main.py", "content": "# App code"},
+                    ),
                     compensation=ActionPayload("DELETE_FILE", {"path": "/Users/Harutyun/Desktop/Portfolio1/main.py"}),
-                    invariants=path_invariant
+                    invariants=path_invariant,
                 ),
                 SagaStep(
                     step_id="2",
                     step_name="Inject Path Traversal Payload",
                     action=ActionPayload("WRITE_FILE", {"path": "/etc/passwd", "content": "hack"}),
                     compensation=ActionPayload("DELETE_FILE", {"path": "/etc/passwd"}),
-                    invariants=path_invariant
-                )
+                    invariants=path_invariant,
+                ),
             ]
 
         def log_callback(step: SagaStep, status: str, error: str = ""):
-            st.session_state.logs.append({
-                "Step": step.step_name,
-                "Action": step.action.tool_name,
-                "State": status,
-                "Error Details": error,
-                "Time": datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            })
+            st.session_state.logs.append(
+                {
+                    "Step": step.step_name,
+                    "Action": step.action.tool_name,
+                    "State": status,
+                    "Error Details": error,
+                    "Time": datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                }
+            )
             time.sleep(0.8)  # Simulate processing delay
 
         # Run the saga orchestrator
@@ -234,11 +252,9 @@ with left_col:
             use_container_width=True,
             column_config={
                 "State": st.column_config.TextColumn(
-                    "State",
-                    help="Active status of the transaction step",
-                    width="medium"
+                    "State", help="Active status of the transaction step", width="medium"
                 )
-            }
+            },
         )
 
 with right_col:
@@ -265,15 +281,24 @@ with right_col:
         m3 = MemoryNode("", now_utc, retrieved_at, "", "", 0.9, 5, [])
         r3 = manager.calculate_retention(m3)
 
-        decay_data.append({"Elapsed Hours": t, "Retention Score": r1, "Memory Profile": "Low Importance (0.3), No retrievals"})
-        decay_data.append({"Elapsed Hours": t, "Retention Score": r2, "Memory Profile": "High Importance (0.9), No retrievals"})
-        decay_data.append({"Elapsed Hours": t, "Retention Score": r3, "Memory Profile": "High Importance (0.9) + 5 Accesses"})
+        decay_data.append(
+            {"Elapsed Hours": t, "Retention Score": r1, "Memory Profile": "Low Importance (0.3), No retrievals"}
+        )
+        decay_data.append(
+            {"Elapsed Hours": t, "Retention Score": r2, "Memory Profile": "High Importance (0.9), No retrievals"}
+        )
+        decay_data.append(
+            {"Elapsed Hours": t, "Retention Score": r3, "Memory Profile": "High Importance (0.9) + 5 Accesses"}
+        )
 
     df_decay = pd.DataFrame(decay_data)
     fig = px.line(
-        df_decay, x="Elapsed Hours", y="Retention Score", color="Memory Profile",
+        df_decay,
+        x="Elapsed Hours",
+        y="Retention Score",
+        color="Memory Profile",
         title="Dynamic Memory Retention Over Time",
-        color_discrete_sequence=["#FF6B6B", "#4D96FF", "#50E3C2"]
+        color_discrete_sequence=["#FF6B6B", "#4D96FF", "#50E3C2"],
     )
     fig.add_hline(y=retention_threshold, line_dash="dash", line_color="orange", annotation_text="Eviction Threshold")
     fig.update_layout(template="plotly_dark", margin=dict(l=20, r=20, t=40, b=20))
@@ -285,12 +310,14 @@ with right_col:
     for m in st.session_state.memory_bank:
         ret = manager.calculate_retention(m)
         status = "Active" if ret >= retention_threshold else "Evicted"
-        mem_records.append({
-            "Summary": m.summary,
-            "Role": m.agent_role,
-            "Importance": m.importance_score,
-            "Retrievals": m.retrieval_count,
-            "Retention Value": f"{ret:.2f}",
-            "State": status
-        })
+        mem_records.append(
+            {
+                "Summary": m.summary,
+                "Role": m.agent_role,
+                "Importance": m.importance_score,
+                "Retrievals": m.retrieval_count,
+                "Retention Value": f"{ret:.2f}",
+                "State": status,
+            }
+        )
     st.table(pd.DataFrame(mem_records))

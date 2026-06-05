@@ -50,11 +50,11 @@ class ColorizedFormatter(logging.Formatter):
     """ANSI-colorized console formatter for development environments."""
 
     COLORS = {
-        "DEBUG":    "\033[36m",   # Cyan
-        "INFO":     "\033[32m",   # Green
-        "WARNING":  "\033[33m",   # Yellow
-        "ERROR":    "\033[31m",   # Red
-        "CRITICAL": "\033[1;31m", # Bold Red
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[1;31m",  # Bold Red
     }
     RESET = "\033[0m"
 
@@ -79,10 +79,12 @@ def configure_logging(env: str | None = None) -> None:
         level = logging.INFO
     else:
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(ColorizedFormatter(
-            fmt="%(asctime)s │ %(levelname)s │ %(name)-32s │ %(message)s",
-            datefmt="%H:%M:%S",
-        ))
+        handler.setFormatter(
+            ColorizedFormatter(
+                fmt="%(asctime)s │ %(levelname)s │ %(name)-32s │ %(message)s",
+                datefmt="%H:%M:%S",
+            )
+        )
         level = logging.DEBUG
 
     root = logging.getLogger()

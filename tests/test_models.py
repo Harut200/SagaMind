@@ -24,6 +24,7 @@ from src.models import (
 # ActionPayload
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestActionPayload:
     """Validate ActionPayload construction and defaults."""
 
@@ -47,6 +48,7 @@ class TestActionPayload:
 # ─────────────────────────────────────────────────────────────────────
 # SagaStep
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestSagaStep:
     """Validate SagaStep construction and default status."""
@@ -102,6 +104,7 @@ class TestSagaStep:
 # MemoryNode
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestMemoryNode:
     """Validate MemoryNode construction and serialization."""
 
@@ -150,8 +153,14 @@ class TestMemoryNode:
     def test_to_dict_contains_all_fields(self, node):
         d = node.to_dict()
         expected_keys = {
-            "memory_id", "created_at", "last_retrieved_at", "agent_role",
-            "summary", "importance_score", "retrieval_count", "embedding",
+            "memory_id",
+            "created_at",
+            "last_retrieved_at",
+            "agent_role",
+            "summary",
+            "importance_score",
+            "retrieval_count",
+            "embedding",
         }
         assert set(d.keys()) == expected_keys
 
@@ -164,6 +173,7 @@ class TestMemoryNode:
 # ─────────────────────────────────────────────────────────────────────
 # Enumerations
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestSagaStatus:
     """Validate SagaStatus enum members and string behaviour."""
@@ -201,6 +211,7 @@ class TestStepStatus:
 # SandboxResult
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestSandboxResult:
     """Validate SandboxResult construction and defaults."""
 
@@ -220,6 +231,7 @@ class TestSandboxResult:
 # ─────────────────────────────────────────────────────────────────────
 # SagaTransaction
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestSagaTransaction:
     """Validate SagaTransaction envelope model."""

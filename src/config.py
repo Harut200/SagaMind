@@ -100,10 +100,7 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """PostgreSQL/TimescaleDB connection URL."""
-        return (
-            f"postgresql://{self.db_user}:{self.db_pass}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
-        )
+        return f"postgresql://{self.db_user}:{self.db_pass}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     @property
     def is_production(self) -> bool:
@@ -132,9 +129,7 @@ class Settings(BaseSettings):
     def _validate_workspace_root(self) -> None:
         root = self.allowed_workspace_root
         if not os.path.isabs(root):
-            raise ValueError(
-                f"ALLOWED_WORKSPACE_ROOT must be an absolute path, got: {root!r}"
-            )
+            raise ValueError(f"ALLOWED_WORKSPACE_ROOT must be an absolute path, got: {root!r}")
 
     def _validate_production(self) -> None:
         """Refuse to boot a production process with insecure configuration."""

@@ -129,7 +129,6 @@ class Z3Verifier:
             allowed_root = settings.allowed_workspace_root
             if not path.startswith(allowed_root):
                 return False, (
-                    f"Semantic Guard Fail: Path '{path}' accesses files "
-                    f"outside authorized workspace '{allowed_root}'."
+                    f"Semantic Guard Fail: Path '{path}' accesses files outside authorized workspace '{allowed_root}'."
                 )
         return True, "Mock Validation Success (Solver bypassed)"

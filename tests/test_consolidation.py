@@ -14,6 +14,7 @@ from src.memory.consolidation import MemoryConsolidator
 # Helpers
 # ─────────────────────────────────────────────────────────────────────
 
+
 def _make_episode(memory_id: str, embedding: list, tenant_id: str = "t1"):
     """Create a dict-based episodic memory record."""
     return {
@@ -36,6 +37,7 @@ def _mock_timescale(episodes):
 # ─────────────────────────────────────────────────────────────────────
 # Insufficient Memories
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestInsufficientMemories:
     """Consolidation skips when fewer than 2 memories are available."""
@@ -68,6 +70,7 @@ class TestInsufficientMemories:
 # Clustering
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestClustering:
     """Validate that similar embeddings are grouped into the same cluster."""
 
@@ -76,7 +79,7 @@ class TestClustering:
         episodes = [
             _make_episode("e1", [1.0, 0.0, 0.0]),
             _make_episode("e2", [0.99, 0.01, 0.0]),  # very close to e1
-            _make_episode("e3", [0.0, 0.0, 1.0]),    # far from e1/e2
+            _make_episode("e3", [0.0, 0.0, 1.0]),  # far from e1/e2
         ]
         ts = _mock_timescale(episodes)
         neo = MagicMock()
@@ -88,10 +91,7 @@ class TestClustering:
 
     def test_all_identical_vectors_single_cluster(self):
         """Identical vectors should form a single cluster."""
-        episodes = [
-            _make_episode(f"e{i}", [0.5, 0.5, 0.5])
-            for i in range(5)
-        ]
+        episodes = [_make_episode(f"e{i}", [0.5, 0.5, 0.5]) for i in range(5)]
         ts = _mock_timescale(episodes)
         neo = MagicMock()
         c = MemoryConsolidator(ts, neo)
@@ -118,6 +118,7 @@ class TestClustering:
 # ─────────────────────────────────────────────────────────────────────
 # Graph Relationship Writing
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestGraphRelationships:
     """Verify that Neo4j upsert_relationship is called for clustered items."""
@@ -147,8 +148,10 @@ class TestGraphRelationships:
 
         c.run_consolidation_cycle("t1", eps=0.3)
 
-        relation_types = {c_call[1]["relation"] if "relation" in c_call[1] else c_call[0][1]
-                         for c_call in neo.upsert_relationship.call_args_list}
+        relation_types = {
+            c_call[1]["relation"] if "relation" in c_call[1] else c_call[0][1]
+            for c_call in neo.upsert_relationship.call_args_list
+        }
         assert "SUMMARIZES_EXPERIENCE" in relation_types
         assert "DISCOVERED_CONCEPT" in relation_types
 
@@ -170,6 +173,7 @@ class TestGraphRelationships:
 # ─────────────────────────────────────────────────────────────────────
 # Cosine Distance Helper
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestCosineDistance:
     """Unit-test the internal cosine distance computation."""
@@ -194,18 +198,18 @@ class TestCosineDistance:
 # Database Query Routing
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestConsolidationDatabaseRoute:
     """Verifies that the consolidation cycle uses the get_all_memories method if available."""
 
     def test_database_fetch_called(self):
         ts = MagicMock()
         # Ensure fallback_storage is not present on the mock to test the get_all_memories branch
-        if hasattr(ts, 'fallback_storage'):
+        if hasattr(ts, "fallback_storage"):
             del ts.fallback_storage
-        ts.get_all_memories = MagicMock(return_value=[
-            _make_episode("e1", [1.0, 0.0]),
-            _make_episode("e2", [0.99, 0.01])
-        ])
+        ts.get_all_memories = MagicMock(
+            return_value=[_make_episode("e1", [1.0, 0.0]), _make_episode("e2", [0.99, 0.01])]
+        )
 
         neo = MagicMock()
         c = MemoryConsolidator(ts, neo)

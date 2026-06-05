@@ -24,6 +24,7 @@ logger = logging.getLogger("SagaMind.Orchestrator")
 
 class CoordinatorError(Exception):
     """Custom exception class for Coordinator-level transaction failures."""
+
     pass
 
 
@@ -84,17 +85,14 @@ class SagaTransactionCoordinator:
             "goal": goal,
             "status": SagaStatus.RUNNING.value,
             "start_time": time.time(),
-            "completed_steps": []
+            "completed_steps": [],
         }
         logger.info(f"[SAGA-{saga_id}] Transaction initialized for tenant '{tenant_id}'. Goal: '{goal}'")
         if self.db:
             self.db.write_transaction_state(saga_id, SagaStatus.RUNNING.value, {"goal": goal})
 
     def execute_saga(
-        self,
-        saga_id: str,
-        steps: list[Any],
-        callback: Callable[[Any, str, str], None] | None = None
+        self, saga_id: str, steps: list[Any], callback: Callable[[Any, str, str], None] | None = None
     ) -> bool:
         """
         Executes a sequence of SagaStep tasks.
@@ -142,10 +140,7 @@ class SagaTransactionCoordinator:
             except Exception as e:
                 step.status = StepStatus.FAILED.value
                 step.error = f"Runtime Execution Exception: {str(e)}"
-                logger.error(
-                    f"[SAGA-{saga_id}] Exception at step '{step.step_name}': {step.error}",
-                    exc_info=True
-                )
+                logger.error(f"[SAGA-{saga_id}] Exception at step '{step.step_name}': {step.error}", exc_info=True)
                 if callback:
                     callback(step, StepStatus.FAILED.value, step.error)
                 self.execute_compensations(saga_id, completed, callback)
@@ -159,10 +154,7 @@ class SagaTransactionCoordinator:
         return True
 
     def execute_compensations(
-        self,
-        saga_id: str,
-        completed_steps: list[Any],
-        callback: Callable[[Any, str, str], None] | None = None
+        self, saga_id: str, completed_steps: list[Any], callback: Callable[[Any, str, str], None] | None = None
     ):
         """
         Executes compensations in reverse chronological order (LIFO).
@@ -192,8 +184,7 @@ class SagaTransactionCoordinator:
                         callback(step, StepStatus.COMPENSATION_FAILED.value, "Compensation execution failed.")
                     if self.db:
                         self.db.write_transaction_state(
-                            saga_id, SagaStatus.COMPENSATION_FAILED.value,
-                            {"failed_step": step.step_name}
+                            saga_id, SagaStatus.COMPENSATION_FAILED.value, {"failed_step": step.step_name}
                         )
                     return
             except Exception as e:

@@ -22,25 +22,28 @@ from typing import Any
 # Enumerations
 # ─────────────────────────────────────────────────────────────────────
 
+
 class SagaStatus(str, enum.Enum):
     """Finite state machine for saga transaction lifecycle."""
-    PENDING       = "PENDING"
-    RUNNING       = "RUNNING"
-    COMMITTED     = "COMMITTED"
-    COMPENSATING  = "COMPENSATING"
-    ROLLED_BACK   = "ROLLED_BACK"
-    FAILED        = "FAILED"
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMMITTED = "COMMITTED"
+    COMPENSATING = "COMPENSATING"
+    ROLLED_BACK = "ROLLED_BACK"
+    FAILED = "FAILED"
     COMPENSATION_FAILED = "COMPENSATION_FAILED"
 
 
 class StepStatus(str, enum.Enum):
     """Finite state machine for individual step lifecycle."""
-    PENDING            = "PENDING"
-    RUNNING            = "RUNNING"
-    COMMITTED          = "COMMITTED"
-    FAILED             = "FAILED"
-    COMPENSATING       = "COMPENSATING"
-    ROLLED_BACK        = "ROLLED_BACK"
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMMITTED = "COMMITTED"
+    FAILED = "FAILED"
+    COMPENSATING = "COMPENSATING"
+    ROLLED_BACK = "ROLLED_BACK"
     COMPENSATION_FAILED = "COMPENSATION_FAILED"
 
 
@@ -48,9 +51,11 @@ class StepStatus(str, enum.Enum):
 # Action / Step Models
 # ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ActionPayload:
     """Describes a single tool invocation with its arguments."""
+
     tool_name: str
     arguments: dict[str, Any] = field(default_factory=dict)
 
@@ -69,6 +74,7 @@ class SagaStep:
         status:        Current lifecycle state (enum-driven).
         error:         Error description if the step failed.
     """
+
     step_id: str
     step_name: str
     action: ActionPayload
@@ -81,6 +87,7 @@ class SagaStep:
 @dataclass
 class SandboxResult:
     """Typed result from sandbox execution."""
+
     success: bool
     status: str = "SUCCESS"
     data: dict[str, Any] = field(default_factory=dict)
@@ -90,6 +97,7 @@ class SandboxResult:
 # ─────────────────────────────────────────────────────────────────────
 # Memory Models
 # ─────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class MemoryNode:
@@ -106,6 +114,7 @@ class MemoryNode:
         retrieval_count:    Number of times this memory has been accessed.
         embedding:          Dense vector representation for similarity search.
     """
+
     memory_id: str
     created_at: datetime
     last_retrieved_at: datetime
@@ -124,12 +133,14 @@ class MemoryNode:
 # Transaction Metadata
 # ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SagaTransaction:
     """
     Top-level metadata envelope for a saga transaction session.
     Tracks the full lifecycle including all completed steps.
     """
+
     saga_id: str
     tenant_id: str
     goal: str

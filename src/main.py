@@ -71,6 +71,7 @@ speculative = SpeculativeOrchestrator(sandbox)
 # Lifespan
 # ─────────────────────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     logger.info("SagaMind API starting (env=%s, auth=%s).", settings.env, settings.auth_enabled)
@@ -119,6 +120,7 @@ async def limit_body_size(request: Request, call_next: Any) -> Any:
 # Security dependencies
 # ─────────────────────────────────────────────────────────────────────
 
+
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
     """Enforce API-key auth when enabled; otherwise a no-op (development)."""
     if not settings.auth_enabled:
@@ -147,6 +149,7 @@ _PROTECTED = [Depends(require_api_key), Depends(enforce_rate_limit)]
 # ─────────────────────────────────────────────────────────────────────
 # Schemas
 # ─────────────────────────────────────────────────────────────────────
+
 
 class StartSagaRequest(BaseModel):
     tenant_id: str
@@ -182,6 +185,7 @@ class HealthResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────
+
 
 @app.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
@@ -250,9 +254,7 @@ def run_consolidation(tenant_id: str, background_tasks: BackgroundTasks) -> dict
 @app.get("/memory/active", dependencies=_PROTECTED)
 def get_active_memories(tenant_id: str, query: str | None = None) -> dict[str, Any]:
     """Retrieve active (non-evicted) memories for a tenant, optionally ranked by *query*."""
-    query_vector = (
-        embedding_service.embed(query) if query else [0.0] * settings.embedding_dim
-    )
+    query_vector = embedding_service.embed(query) if query else [0.0] * settings.embedding_dim
     memories = timescale.retrieve_similar_memories(tenant_id, query_vector)
 
     active = []

@@ -21,6 +21,7 @@ from src.models import MemoryNode
 # Fixture
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def manager():
     """Default EbbinghausMemoryManager with standard parameters."""
@@ -51,6 +52,7 @@ def _make_node(
 # Fresh vs Stale Memory
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestRetentionCurve:
     """Validate the exponential decay curve behaviour."""
 
@@ -77,6 +79,7 @@ class TestRetentionCurve:
 # Importance and Retrieval Effects
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestDecayFactors:
     """Validate that importance and retrieval_count modulate the decay rate."""
 
@@ -86,9 +89,7 @@ class TestDecayFactors:
         low = _make_node(hours_since_retrieval=48, importance=0.2, retrieval_count=1)
         r_high = manager.calculate_retention(high)
         r_low = manager.calculate_retention(low)
-        assert r_high > r_low, (
-            f"Expected high-importance retention ({r_high}) > low-importance ({r_low})"
-        )
+        assert r_high > r_low, f"Expected high-importance retention ({r_high}) > low-importance ({r_low})"
 
     def test_retrieval_count_reinforcement(self, manager):
         """More retrievals → stronger memory strength → higher retention."""
@@ -96,18 +97,12 @@ class TestDecayFactors:
         few = _make_node(hours_since_retrieval=48, importance=0.5, retrieval_count=0)
         r_many = manager.calculate_retention(many)
         r_few = manager.calculate_retention(few)
-        assert r_many > r_few, (
-            f"Expected many-retrieval retention ({r_many}) > few-retrieval ({r_few})"
-        )
+        assert r_many > r_few, f"Expected many-retrieval retention ({r_many}) > few-retrieval ({r_few})"
 
     def test_retrieval_bonus_is_logarithmic(self, manager):
         """Doubling retrieval count should NOT double retention; growth is ln-scaled."""
-        r10 = manager.calculate_retention(
-            _make_node(hours_since_retrieval=24, importance=0.5, retrieval_count=10)
-        )
-        r20 = manager.calculate_retention(
-            _make_node(hours_since_retrieval=24, importance=0.5, retrieval_count=20)
-        )
+        r10 = manager.calculate_retention(_make_node(hours_since_retrieval=24, importance=0.5, retrieval_count=10))
+        r20 = manager.calculate_retention(_make_node(hours_since_retrieval=24, importance=0.5, retrieval_count=20))
         # The difference should be small because log growth flattens
         assert (r20 - r10) < 0.3
 
@@ -115,6 +110,7 @@ class TestDecayFactors:
 # ─────────────────────────────────────────────────────────────────────
 # Edge Cases
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestEdgeCases:
     """Validate boundary and degenerate inputs."""
@@ -142,6 +138,7 @@ class TestEdgeCases:
 # evaluate_memories Partition
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestEvaluateMemories:
     """Validate the keep/prune partition logic."""
 
@@ -158,20 +155,14 @@ class TestEvaluateMemories:
 
     def test_all_fresh_memories_kept(self, manager):
         """Memories retrieved just now with high importance should all be kept."""
-        nodes = [
-            _make_node(hours_since_retrieval=0.01, importance=0.9, retrieval_count=5)
-            for _ in range(5)
-        ]
+        nodes = [_make_node(hours_since_retrieval=0.01, importance=0.9, retrieval_count=5) for _ in range(5)]
         keep, prune = manager.evaluate_memories(nodes)
         assert len(keep) == 5
         assert len(prune) == 0
 
     def test_all_stale_memories_pruned(self, manager):
         """Very old, low-importance memories should all be pruned."""
-        nodes = [
-            _make_node(hours_since_retrieval=5000, importance=0.05, retrieval_count=0)
-            for _ in range(3)
-        ]
+        nodes = [_make_node(hours_since_retrieval=5000, importance=0.05, retrieval_count=0) for _ in range(3)]
         keep, prune = manager.evaluate_memories(nodes)
         assert len(prune) == 3
         assert len(keep) == 0

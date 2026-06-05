@@ -59,14 +59,11 @@ def contain_path(path: str, root: str | None = None) -> str:
     try:
         common = os.path.commonpath([real_root, real_path])
     except ValueError as exc:  # e.g. different drives on Windows
-        raise PathSecurityError(
-            f"Path '{path}' is not comparable to workspace root '{root}'."
-        ) from exc
+        raise PathSecurityError(f"Path '{path}' is not comparable to workspace root '{root}'.") from exc
 
     if common != real_root:
         raise PathSecurityError(
-            f"Path traversal blocked: '{path}' resolves to '{real_path}', "
-            f"outside authorized workspace '{real_root}'."
+            f"Path traversal blocked: '{path}' resolves to '{real_path}', outside authorized workspace '{real_root}'."
         )
     return real_path
 

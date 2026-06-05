@@ -19,6 +19,7 @@ from src.verifier.z3_prover import Z3Verifier
 # Fixture — verifier in fallback mode (z3 not importable)
 # ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def verifier():
     """Z3Verifier initialised in fallback mode (no z3 package)."""
@@ -31,6 +32,7 @@ def verifier():
 # ─────────────────────────────────────────────────────────────────────
 # Path-Prefix Safety
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestPathPrefixVerification:
     """Validate the semantic guard for file-system path constraints."""
@@ -74,6 +76,7 @@ class TestPathPrefixVerification:
 # Non-path Arguments
 # ─────────────────────────────────────────────────────────────────────
 
+
 class TestNonPathArguments:
     """Arguments that do not contain a 'path' key should always pass."""
 
@@ -93,6 +96,7 @@ class TestNonPathArguments:
 # ─────────────────────────────────────────────────────────────────────
 # Numeric Arguments
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestNumericArguments:
     """Numeric values must not cause type errors in the verifier."""
@@ -115,6 +119,7 @@ class TestNumericArguments:
 # ─────────────────────────────────────────────────────────────────────
 # Empty Invariants
 # ─────────────────────────────────────────────────────────────────────
+
 
 class TestEmptyInvariants:
     """Empty or whitespace-only invariant strings are handled gracefully."""
