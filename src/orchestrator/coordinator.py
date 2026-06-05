@@ -33,11 +33,48 @@ class SagaTransactionCoordinator:
     non-deterministic multi-agent paths.
     """
 
-    def __init__(self, verifier_instance: Any, sandbox_instance: Any, db_client: Any | None = None):
+    def __init__(
+        self,
+        verifier_instance: Any,
+        sandbox_instance: Any,
+        db_client: Any | None = None,
+        max_active_sagas: int = 10_000,
+    ):
         self.verifier = verifier_instance
         self.sandbox = sandbox_instance
         self.db = db_client
+        self.max_active_sagas = max_active_sagas
         self.active_sagas: dict[str, dict[str, Any]] = {}
+
+    def get_saga_status(self, saga_id: str) -> dict[str, Any] | None:
+        """Return a snapshot of the saga's current state, or None if unknown."""
+        saga = self.active_sagas.get(saga_id)
+        if saga is None:
+            return None
+        return {
+            "saga_id": saga["saga_id"],
+            "tenant_id": saga["tenant_id"],
+            "goal": saga["goal"],
+            "status": saga["status"],
+            "start_time": saga["start_time"],
+            "completed_steps": [s.step_name for s in saga["completed_steps"]],
+        }
+
+    def _evict_if_needed(self) -> None:
+        """Bound in-memory saga retention to avoid unbounded growth in long-running processes."""
+        if len(self.active_sagas) <= self.max_active_sagas:
+            return
+        terminal = {
+            SagaStatus.COMMITTED.value,
+            SagaStatus.ROLLED_BACK.value,
+            SagaStatus.COMPENSATION_FAILED.value,
+        }
+        # Oldest-first eviction of finished sagas only.
+        for sid in list(self.active_sagas.keys()):
+            if len(self.active_sagas) <= self.max_active_sagas:
+                break
+            if self.active_sagas[sid]["status"] in terminal:
+                del self.active_sagas[sid]
 
     def start_transaction_log(self, saga_id: str, goal: str, tenant_id: str):
         """Initialize a new saga transaction session."""
@@ -118,6 +155,7 @@ class SagaTransactionCoordinator:
         if self.db:
             self.db.write_transaction_state(saga_id, SagaStatus.COMMITTED.value, {})
         logger.info(f"[SAGA-{saga_id}] Saga transaction committed successfully.")
+        self._evict_if_needed()
         return True
 
     def execute_compensations(

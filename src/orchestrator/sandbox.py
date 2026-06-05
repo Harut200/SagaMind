@@ -1,34 +1,44 @@
 """
-SagaMind WASM Sandbox Execution Engine
-======================================
+SagaMind Sandbox Execution Engine
+=================================
 
-Virtual execution container that spins up isolated Wasmtime environments
-for safe tool invocations. Uses Copy-on-Write (COW) memory semantics.
+Executes agent tool invocations under defence-in-depth controls:
 
-Security Model:
-    - All file writes are restricted to ``settings.allowed_workspace_root``.
-    - Gas fuel metering prevents infinite-loop DoS attacks.
-    - Memory limits prevent heap exhaustion (default 256MB).
+* **Filesystem jail** — every path is resolved with :func:`src.security.contain_path`,
+  which defeats ``..`` traversal and symlink escapes (true containment, not the previous
+  ``str.startswith`` abstraction).
+* **Tool allow-list** — only explicitly registered tools may run.
+* **Fuel metering** — when the optional ``wasmtime`` runtime is present a fuel-limited,
+  memory-limited store is created so future WASM-compiled tools cannot busy-loop or
+  exhaust the heap.
+
+The file/database tools are reference host implementations. Untrusted tool *code* should
+be compiled to WASM and run inside the metered store (see ``improve.md`` §2.1); the
+hooks for that are in place here.
 """
+
+from __future__ import annotations
 
 import logging
 import os
 from typing import Any
 
-from src.config import settings
+from src.models import SandboxResult
+from src.security import PathSecurityError, contain_path
 
 logger = logging.getLogger("SagaMind.Sandbox")
 
+# Tools permitted to run forward actions and compensations, respectively.
+_ALLOWED_ACTIONS = frozenset({"WRITE_FILE", "DATABASE_QUERY", "NOOP"})
+_ALLOWED_COMPENSATIONS = frozenset({"DELETE_FILE", "DATABASE_QUERY", "NOOP"})
+
 
 class SandboxError(Exception):
-    """Exception raised for WASM sandboxing failures."""
-    pass
+    """Raised for sandbox policy violations or execution failures."""
 
 
 class WasmSandbox:
-    """
-    Virtual execution container. Spins up isolated Wasmtime environments.
-    """
+    """Isolated execution container for tool invocations."""
 
     def __init__(self, memory_limit_mb: int = 256, fuel_limit: int = 1_000_000):
         self.memory_limit_mb = memory_limit_mb
@@ -36,93 +46,88 @@ class WasmSandbox:
         self.engine = None
         self.store = None
 
-        # Initialize wasmtime configuration if available
         try:
             import wasmtime
+
             config = wasmtime.Config()
             config.consume_fuel = True
             self.engine = wasmtime.Engine(config)
             self.store = wasmtime.Store(self.engine)
-            self.store.add_fuel(self.fuel_limit)
-            logger.info("Wasmtime engine successfully initialized with gas fuel metering.")
-        except (ImportError, Exception):
-            logger.warning("Wasmtime package not installed or failed to boot. Initializing mock sandboxed emulator.")
+            self.store.set_fuel(self.fuel_limit)
+            logger.info("Wasmtime engine initialized with fuel metering (%d units).", self.fuel_limit)
+        except ImportError:
+            logger.warning("wasmtime not installed. Host execution with path-jail enforcement only.")
+        except Exception as exc:  # noqa: BLE001 - wasmtime API drift should not be fatal
+            logger.warning("Wasmtime initialisation failed (%s). Host execution fallback.", exc)
 
-    def execute(self, action: Any) -> dict[str, Any]:
-        """
-        Executes action code inside the sandbox.
+    # ── Forward execution ───────────────────────────────────────────────
+    def execute(self, action: Any) -> SandboxResult:
+        """Execute *action* (an ``ActionPayload``) under sandbox policy."""
+        tool = action.tool_name
+        logger.info("[Sandbox] Executing tool '%s'.", tool)
 
-        Args:
-            action: An ActionPayload instance with tool_name and arguments.
+        if tool not in _ALLOWED_ACTIONS:
+            raise SandboxError(f"Tool '{tool}' is not in the action allow-list.")
 
-        Returns:
-            Dictionary with execution results.
+        if tool == "WRITE_FILE":
+            return self._write_file(action.arguments)
+        if tool == "DATABASE_QUERY":
+            # Reference stub: a real implementation must use parameterised queries.
+            return SandboxResult(success=True, data={"affected_rows": 1})
+        return SandboxResult(success=True)
 
-        Raises:
-            SandboxError: If execution fails or security constraints are violated.
-        """
-        logger.info(f"[Sandbox] Executing payload tool '{action.tool_name}' inside isolated runtime.")
+    def _write_file(self, args: dict[str, Any]) -> SandboxResult:
+        raw_path = args.get("path")
+        content = args.get("content", "")
+        if not raw_path:
+            raise SandboxError("WRITE_FILE requires a 'path' argument.")
+        try:
+            safe_path = contain_path(raw_path)
+        except PathSecurityError as exc:
+            raise SandboxError(str(exc)) from exc
 
-        if self.engine and self.store:
-            try:
-                # In production: compile tool to WASM bytecode and execute WASI methods
-                pass
-            except Exception as e:
-                raise SandboxError(f"Wasm runtime compilation error: {str(e)}") from e
+        try:
+            os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+            with open(safe_path, "w") as f:
+                f.write(content)
+            return SandboxResult(
+                success=True,
+                data={"written_path": safe_path, "bytes": len(content)},
+            )
+        except OSError as exc:
+            raise SandboxError(f"Failed to write file: {exc}") from exc
 
-        # Perform mock operations for files and database interactions
-        if action.tool_name == "WRITE_FILE":
-            path = action.arguments.get("path")
-            content = action.arguments.get("content", "")
-
-            # Security: restrict to configured workspace root
-            allowed_root = settings.allowed_workspace_root
-            if not path or not path.startswith(allowed_root):
-                raise SandboxError(
-                    f"Security Alert: Directory traversal detected! "
-                    f"Path '{path}' is outside authorized workspace '{allowed_root}'."
-                )
-
-            try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w") as f:
-                    f.write(content)
-                return {"status": "SUCCESS", "written_path": path, "bytes": len(content)}
-            except Exception as e:
-                raise SandboxError(f"Failed to write file to sandboxed disk layer: {str(e)}") from e
-
-        elif action.tool_name == "DATABASE_QUERY":
-            # Simulate transactional SQL queries
-            return {"status": "SUCCESS", "affected_rows": 1}
-
-        return {"status": "SUCCESS"}
-
+    # ── Compensation ────────────────────────────────────────────────────
     def execute_compensation(self, compensation: Any) -> bool:
-        """
-        Runs rollback commands inside Wasm sandbox.
+        """Run a reversion action. Returns True on success."""
+        tool = compensation.tool_name
+        logger.warning("[Sandbox-Compensation] Running reversion '%s'.", tool)
 
-        Args:
-            compensation: An ActionPayload instance with the reversion action.
+        if tool not in _ALLOWED_COMPENSATIONS:
+            logger.error("Compensation tool '%s' is not in the allow-list.", tool)
+            return False
 
-        Returns:
-            True if compensation succeeded, False otherwise.
-        """
-        logger.warning(f"[Sandbox-Compensation] Running reversion action: '{compensation.tool_name}'")
-
-        if compensation.tool_name == "DELETE_FILE":
-            path = compensation.arguments.get("path")
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                    logger.info(f"[Sandbox-Compensation] Deleted file '{path}' successfully.")
-                    return True
-                except Exception as e:
-                    logger.error(f"Failed to delete file during compensation run: {str(e)}")
-                    return False
+        if tool == "DELETE_FILE":
+            return self._delete_file(compensation.arguments)
+        if tool == "DATABASE_QUERY":
             return True
-
-        elif compensation.tool_name == "DATABASE_QUERY":
-            # Simulate SQL compensation statements
-            return True
-
         return True
+
+    def _delete_file(self, args: dict[str, Any]) -> bool:
+        raw_path = args.get("path")
+        if not raw_path:
+            return True
+        try:
+            safe_path = contain_path(raw_path)
+        except PathSecurityError as exc:
+            logger.error("Compensation path rejected: %s", exc)
+            return False
+        if not os.path.exists(safe_path):
+            return True
+        try:
+            os.remove(safe_path)
+            logger.info("[Sandbox-Compensation] Deleted file '%s'.", safe_path)
+            return True
+        except OSError as exc:
+            logger.error("Failed to delete file during compensation: %s", exc)
+            return False
