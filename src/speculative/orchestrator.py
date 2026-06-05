@@ -85,7 +85,7 @@ class SpeculativeOrchestrator:
         for result in results:
             if result.get("success") and self.commit_sandbox_state(result["sandbox_id"]):
                 self._discard_others(result["sandbox_id"])
-                return result["sandbox_id"]
+                return str(result["sandbox_id"])
         return None
 
     def commit_sandbox_state(self, sandbox_id: str) -> bool:
