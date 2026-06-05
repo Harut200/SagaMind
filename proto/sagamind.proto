@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package sagamind.v1;
+
+// SagaMind transactional runtime gRPC surface. Mirrors the REST API in src/main.py.
+// Generate Python stubs with: ./scripts/gen_proto.sh  (outputs to src/generated/).
+service SagaMind {
+  rpc StartSaga (StartSagaRequest) returns (StartSagaResponse);
+  rpc SubmitStep (StepProposal) returns (StepResult);
+  rpc GetSagaStatus (SagaStatusRequest) returns (SagaStatusResponse);
+  // Server-streaming variant emitting one event per step lifecycle transition.
+  rpc StreamSteps (StepProposal) returns (stream StepEvent);
+}
+
+message StartSagaRequest {
+  string tenant_id = 1;
+  string goal = 2;
+}
+
+message StartSagaResponse {
+  string saga_id = 1;
+  string status = 2;
+}
+
+message StepProposal {
+  string saga_id = 1;
+  string step_name = 2;
+  string tool_name = 3;
+  map<string, string> arguments = 4;
+  string compensation_tool = 5;
+  map<string, string> compensation_arguments = 6;
+  string invariants = 7;
+}
+
+message StepResult {
+  string status = 1;
+  string step_id = 2;
+  string error = 3;
+}
+
+message StepEvent {
+  string step_name = 1;
+  string status = 2;
+  string error = 3;
+  double timestamp = 4;
+}
+
+message SagaStatusRequest {
+  string saga_id = 1;
+}
+
+message SagaStatusResponse {
+  string saga_id = 1;
+  string tenant_id = 2;
+  string goal = 3;
+  string status = 4;
+  repeated string completed_steps = 5;
+}
