@@ -229,6 +229,7 @@ class SagaTransactionCoordinator:
                     return
             except Exception as e:
                 step.status = StepStatus.COMPENSATION_FAILED.value
+                metrics.inc("compensations_failed")
                 logger.error(
                     f"[SAGA-{saga_id}] [CRITICAL] Exception during rollback for step '{step.step_name}': {str(e)}"
                 )
@@ -237,6 +238,7 @@ class SagaTransactionCoordinator:
                 return
 
         self.active_sagas[saga_id]["status"] = SagaStatus.ROLLED_BACK.value
+        metrics.inc("sagas_rolled_back")
         if self.db:
             self.db.write_transaction_state(saga_id, SagaStatus.ROLLED_BACK.value, {})
         logger.warning(f"[SAGA-{saga_id}] Rollback complete. Eventual consistency restored.")
