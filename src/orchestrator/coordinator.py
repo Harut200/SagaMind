@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 from src.models import ActionPayload, SagaStatus, StepStatus
+from src.observability import metrics
 
 # Setup logging channel
 logger = logging.getLogger("SagaMind.Orchestrator")
@@ -61,6 +62,32 @@ class SagaTransactionCoordinator:
             "completed_steps": [s.step_name for s in saga["completed_steps"]],
         }
 
+    def recover(self) -> int:
+        """Replay persisted compensations for sagas left incomplete by a crash.
+
+        Returns the number of sagas rolled back. Requires a durable ``db_client`` exposing
+        ``list_incomplete`` / ``write_transaction_state`` (see ``SagaStateStore``).
+        """
+        if not self.db or not hasattr(self.db, "list_incomplete"):
+            return 0
+        recovered = 0
+        for saga in self.db.list_incomplete():
+            saga_id = saga["saga_id"]
+            comps = saga.get("compensations", [])
+            logger.warning("[RECOVERY] Compensating %d step(s) for incomplete saga %s", len(comps), saga_id)
+            for comp in reversed(comps):
+                try:
+                    self.sandbox.execute_compensation(
+                        ActionPayload(comp["tool_name"], comp.get("arguments", {}))
+                    )
+                except Exception as exc:  # noqa: BLE001 - best-effort recovery, continue
+                    logger.error("[RECOVERY] Compensation failed for saga %s: %s", saga_id, exc)
+            self.db.write_transaction_state(saga_id, SagaStatus.ROLLED_BACK.value, {"recovered": True})
+            recovered += 1
+        if recovered:
+            logger.warning("[RECOVERY] Rolled back %d incomplete saga(s) on startup.", recovered)
+        return recovered
+
     def _evict_if_needed(self) -> None:
         """Bound in-memory saga retention to avoid unbounded growth in long-running processes."""
         if len(self.active_sagas) <= self.max_active_sagas:
@@ -87,9 +114,12 @@ class SagaTransactionCoordinator:
             "start_time": time.time(),
             "completed_steps": [],
         }
+        metrics.inc("sagas_started")
         logger.info(f"[SAGA-{saga_id}] Transaction initialized for tenant '{tenant_id}'. Goal: '{goal}'")
         if self.db:
-            self.db.write_transaction_state(saga_id, SagaStatus.RUNNING.value, {"goal": goal})
+            self.db.write_transaction_state(
+                saga_id, SagaStatus.RUNNING.value, {"goal": goal, "tenant_id": tenant_id}
+            )
 
     def execute_saga(
         self, saga_id: str, steps: list[Any], callback: Callable[[Any, str, str], None] | None = None
@@ -119,8 +149,10 @@ class SagaTransactionCoordinator:
 
             try:
                 # 1. Verification Gate
-                ver_ok, explanation = self.verifier.verify(step.action.arguments, step.invariants)
+                with metrics.time("verify_seconds"):
+                    ver_ok, explanation = self.verifier.verify(step.action.arguments, step.invariants)
                 if not ver_ok:
+                    metrics.inc("steps_rejected")
                     step.status = StepStatus.FAILED.value
                     step.error = f"Logic Solver check failed: {explanation}"
                     logger.error(f"[SAGA-{saga_id}] Invariant violation at step '{step.step_name}': {explanation}")
@@ -130,7 +162,8 @@ class SagaTransactionCoordinator:
                     return False
 
                 # 2. Execute in sandbox
-                self.sandbox.execute(step.action)
+                with metrics.time("step_seconds"):
+                    self.sandbox.execute(step.action)
                 step.status = StepStatus.COMMITTED.value
                 completed.append(step)
                 # Persist the compensation so a crash mid-saga can be rolled back on recovery.
@@ -152,6 +185,7 @@ class SagaTransactionCoordinator:
                 return False
 
         saga_meta["status"] = SagaStatus.COMMITTED.value
+        metrics.inc("sagas_committed")
         if self.db:
             self.db.write_transaction_state(saga_id, SagaStatus.COMMITTED.value, {})
         logger.info(f"[SAGA-{saga_id}] Saga transaction committed successfully.")
@@ -184,6 +218,7 @@ class SagaTransactionCoordinator:
                         callback(step, StepStatus.ROLLED_BACK.value, "")
                 else:
                     step.status = StepStatus.COMPENSATION_FAILED.value
+                    metrics.inc("compensations_failed")
                     logger.error(f"[SAGA-{saga_id}] [CRITICAL] Compensation failed for step '{step.step_name}'!")
                     if callback:
                         callback(step, StepStatus.COMPENSATION_FAILED.value, "Compensation execution failed.")
