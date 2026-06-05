@@ -16,7 +16,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from src.models import SagaStatus, StepStatus
+from src.models import ActionPayload, SagaStatus, StepStatus
 
 # Setup logging channel
 logger = logging.getLogger("SagaMind.Orchestrator")
@@ -133,6 +133,11 @@ class SagaTransactionCoordinator:
                 self.sandbox.execute(step.action)
                 step.status = StepStatus.COMMITTED.value
                 completed.append(step)
+                # Persist the compensation so a crash mid-saga can be rolled back on recovery.
+                if self.db and hasattr(self.db, "append_compensation"):
+                    self.db.append_compensation(
+                        saga_id, step.compensation.tool_name, step.compensation.arguments
+                    )
                 logger.info(f"[SAGA-{saga_id}] Step '{step.step_name}' executed and committed successfully.")
                 if callback:
                     callback(step, StepStatus.COMMITTED.value, "")
