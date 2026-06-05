@@ -1,0 +1,43 @@
+# Version control / CI
+.git
+.github
+.gitignore
+
+# Python caches and build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local secrets and data
+.env
+.env.local
+.env.production
+timescale_data/
+neo4j_data/
+redis_data/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+
+# Docs and tests are not needed in the runtime image
+tests/
+ABOUT/
+*.md
+docker-compose*.yml
