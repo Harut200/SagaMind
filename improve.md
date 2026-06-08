@@ -4,10 +4,13 @@ End-to-end gap analysis of SagaMind. Every open item carries a severity rating, 
 diagnosis, exact code location, and a concrete fix prescription. Closed items are kept for
 historical reference with their remediation summary.
 
-**Current state (2026-06-05):** 140 tests pass, 1 skipped; ruff + mypy clean; 23 source
-files. Core saga/memory/verifier/speculative/gRPC surfaces implemented. Remaining work is
-divided into: security hardening, correctness gaps, performance, CI/CD maturity, and the
-feature roadmap.
+**Current state (2026-06-07):** 141 tests pass, 2 skipped; ruff clean, format clean. Core
+saga/memory/verifier/speculative/gRPC surfaces implemented, plus durable-saga reliability
+(pool, idempotency, dead-letter), per-tool schema validation, request-ID correlation,
+DBSCAN consolidation, embedding LRU cache, Neo4j retries, pluggable tool registry,
+APScheduler sleep-cycle, property-based tests, and CI integration/gRPC/Docker/Dependabot.
+Remaining work is mostly performance (push retention to SQL, native cosine kernel) and the
+forward feature roadmap (distributed sagas, GraphRAG, HITL gate, replay, SDK).
 
 Legend: **[BUG]** real defect · **[STUB]** advertised but not implemented · **[GAP]** missing
 for production · **[PERF]** measurable speed opportunity · **[FEAT]** new capability.
@@ -29,27 +32,27 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 | 8 | Speculative execution was an `asyncio.sleep` mock, unwired | STUB | P1 | ✅ |
 | 9 | Consolidation O(n²) pure-Python; LLM distillation unwired | STUB/PERF | P1 | ✅ |
 | 10 | No embedding generation (dummy `[0.1]*1536` vector at query time) | GAP | P1 | ✅ |
-| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | P1 | 🟡 |
+| 11 | No CI, no coverage gate, no pre-commit, no integration tests | GAP | P1 | ✅ |
 | 12 | Decay path mixed naive/aware datetimes → `TypeError` in dashboard | BUG | P1 | ✅ |
 | 13 | Vector/decay math in pure Python | PERF | P2 | 🟡 |
-| 14 | `SagaStateStore` uses single Postgres connection, not a pool | BUG | P1 | ⬜ |
-| 15 | Per-tool argument schema validation absent; `DATABASE_QUERY` takes raw SQL | GAP/SEC | P0 | ⬜ |
-| 16 | `SagaTransaction` dataclass dead-code; coordinator uses raw `dict` | GAP | P2 | ⬜ |
-| 17 | Unknown-saga `execute_saga` silently auto-creates saga as `default_tenant` | BUG | P1 | ⬜ |
-| 18 | No saga step idempotency key — duplicate submission double-executes | GAP | P1 | ⬜ |
-| 19 | Embedding calls not cached; repeated identical queries hit OpenAI every time | PERF/COST | P2 | ⬜ |
-| 20 | In-memory saga state mirror in `SagaStateStore` never pruned — memory leak | BUG | P2 | ⬜ |
-| 21 | No request-ID / correlation-ID propagation across log lines | GAP | P2 | ⬜ |
-| 22 | Consolidation uses connected-components, not density clustering (DBSCAN) | PERF/STUB | P2 | ⬜ |
+| 14 | `SagaStateStore` uses single Postgres connection, not a pool | BUG | P1 | ✅ |
+| 15 | Per-tool argument schema validation absent; `DATABASE_QUERY` takes raw SQL | GAP/SEC | P0 | ✅ |
+| 16 | `SagaTransaction` dataclass dead-code; coordinator uses raw `dict` | GAP | P2 | ✅ |
+| 17 | Unknown-saga `execute_saga` silently auto-creates saga as `default_tenant` | BUG | P1 | ✅ |
+| 18 | No saga step idempotency key — duplicate submission double-executes | GAP | P1 | ✅ |
+| 19 | Embedding calls not cached; repeated identical queries hit OpenAI every time | PERF/COST | P2 | ✅ |
+| 20 | In-memory saga state mirror in `SagaStateStore` never pruned — memory leak | BUG | P2 | ✅ |
+| 21 | No request-ID / correlation-ID propagation across log lines | GAP | P2 | ✅ |
+| 22 | Consolidation uses connected-components, not density clustering (DBSCAN) | PERF/STUB | P2 | ✅ |
 | 23 | Retention math computed per-row in Python; should push to TimescaleDB SQL | PERF | P2 | ⬜ |
-| 24 | gRPC server requires `make proto` codegen; not automated in CI | GAP | P2 | ⬜ |
-| 25 | No Postgres connection reconnect / health-check after drop | BUG | P1 | ⬜ |
-| 26 | Integration test suite not wired into CI (only runs locally `RUN_INTEGRATION=1`) | GAP | P1 | ⬜ |
-| 27 | Pluggable tool registry absent; allow-list is a hardcoded `frozenset` | GAP/FEAT | P2 | ⬜ |
-| 28 | No scheduler for consolidation "sleep cycle" — manual POST only | GAP | P2 | ⬜ |
-| 29 | No dead-letter / human-intervention path for `COMPENSATION_FAILED` sagas | GAP | P1 | ⬜ |
-| 30 | No timeouts or retries on Neo4j / LLM / Z3 external calls | GAP | P1 | ⬜ |
-| 31 | `/memory/active` returns unbounded result set — no pagination | GAP | P2 | ⬜ |
+| 24 | gRPC server requires `make proto` codegen; not automated in CI | GAP | P2 | ✅ |
+| 25 | No Postgres connection reconnect / health-check after drop | BUG | P1 | ✅ |
+| 26 | Integration test suite not wired into CI (only runs locally `RUN_INTEGRATION=1`) | GAP | P1 | ✅ |
+| 27 | Pluggable tool registry absent; allow-list is a hardcoded `frozenset` | GAP/FEAT | P2 | ✅ |
+| 28 | No scheduler for consolidation "sleep cycle" — manual POST only | GAP | P2 | ✅ |
+| 29 | No dead-letter / human-intervention path for `COMPENSATION_FAILED` sagas | GAP | P1 | ✅ |
+| 30 | No timeouts or retries on Neo4j / LLM / Z3 external calls | GAP | P1 | 🟡 |
+| 31 | `/memory/active` returns unbounded result set — no pagination | GAP | P2 | ✅ |
 | 32 | Distributed saga orchestration (Temporal/Celery) — single-process only | FEAT | P2 | ⬜ |
 | 33 | GraphRAG-style retrieval: Neo4j graph never feeds agent context | FEAT | P2 | ⬜ |
 | 34 | Human-in-the-loop saga gate: pause for approval before high-risk step | FEAT | P3 | ⬜ |
@@ -59,9 +62,9 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 | 38 | Memory importance reinforcement learning from retrieval outcomes | FEAT | P3 | ⬜ |
 | 39 | SDK / client library (Python first) | FEAT | P3 | ⬜ |
 | 40 | Rust/PyO3 native extension for cosine distance kernel | PERF | P3 | ⬜ |
-| 41 | Dependabot / Renovate for dependency freshness | GAP | P3 | ⬜ |
+| 41 | Dependabot / Renovate for dependency freshness | GAP | P3 | ✅ |
 | 42 | `mypy` `disallow_untyped_defs = false` — type annotations incomplete | GAP | P3 | ⬜ |
-| 43 | Property-based tests (Hypothesis) for saga FSM and decay math | GAP | P2 | ⬜ |
+| 43 | Property-based tests (Hypothesis) for saga FSM and decay math | GAP | P2 | ✅ |
 
 ---
 
@@ -71,7 +74,11 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 **Fixed.** `from psycopg2 import pool as pg_pool`. The store now connects correctly and
 registers the pgvector type adapter.
 
-### 1.2 ⬜ [BUG] `SagaStateStore` uses a single Postgres connection, not a pool
+### 1.2 ✅ [BUG] `SagaStateStore` uses a single Postgres connection, not a pool
+
+**Fixed.** `_try_postgres` now builds a `pool.ThreadedConnectionPool(minconn=2, maxconn=10)`;
+`_pg_conn`/`_pg_return` checkout/return with reconnect-on-stale, `close()` calls `closeall()`.
+Original diagnosis kept below for context.
 
 **Location:** `src/orchestrator/state_store.py:77` — `psycopg2.connect(...)` returns one
 connection with `autocommit = True`.
@@ -97,7 +104,10 @@ Use `self._pg_pool.getconn()` / `putconn()` in a `try/finally` block within each
 Replace the current `self._pg` single-connection path. Add a `close()` that calls
 `self._pg_pool.closeall()`.
 
-### 1.3 ⬜ [BUG] `execute_saga` silently auto-creates a saga for unknown `saga_id`
+### 1.3 ✅ [BUG] `execute_saga` silently auto-creates a saga for unknown `saga_id`
+
+**Fixed.** Raises `CoordinatorError("Saga '...' not found. Call start_transaction_log first.")`;
+`/saga/step` catches it → HTTP 404. Original diagnosis kept below for context.
 
 **Location:** `src/orchestrator/coordinator.py:135`
 ```python
@@ -117,7 +127,10 @@ if saga_id not in self.active_sagas:
 ```
 The `/saga/step` endpoint should catch `CoordinatorError` and return 404.
 
-### 1.4 ⬜ [BUG] In-memory saga state mirror in `SagaStateStore` never pruned
+### 1.4 ✅ [BUG] In-memory saga state mirror in `SagaStateStore` never pruned
+
+**Fixed.** `_state`/`_comps` are written only when `self.backend == "memory"`. Original
+diagnosis kept below for context.
 
 **Location:** `src/orchestrator/state_store.py:141-143`
 ```python
@@ -145,7 +158,10 @@ def write_transaction_state(self, saga_id, status, metadata):
         rec["metadata"].update(metadata or {})
 ```
 
-### 1.5 ⬜ [BUG] Postgres connection not re-established after drop
+### 1.5 ✅ [BUG] Postgres connection not re-established after drop
+
+**Fixed via the pool (§1.2).** `_pg_conn()` retries `getconn()` through `_try_postgres()`
+reconnect on failure; pool manages connection lifecycle/health. Original diagnosis below.
 
 **Location:** `src/orchestrator/state_store.py` — all methods call `self._pg.cursor()`.
 
@@ -211,7 +227,11 @@ embed the bytes in `sandbox.py`, and redirect `_ALLOWED_ACTIONS["WRITE_FILE"]` t
 `run_wasm_module(WRITE_FILE_WASM, ...)`. All existing tests pass because `SandboxResult`
 interface is unchanged.
 
-### 2.2 ⬜ [GAP/SEC] Per-tool argument schema validation absent; `DATABASE_QUERY` takes raw SQL
+### 2.2 ✅ [GAP/SEC] Per-tool argument schema validation absent; `DATABASE_QUERY` takes raw SQL
+
+**Fixed.** `src/main.py` adds `WriteFileArgs`/`DatabaseQueryArgs(table, operation: Literal[...],
+filters)`/`NoopArgs` Pydantic schemas + `_validate_tool_args()` gate before sandbox dispatch —
+no raw SQL string accepted. Original diagnosis kept below for context.
 
 **Location:** `src/orchestrator/sandbox.py:72`
 ```python
@@ -262,7 +282,12 @@ def execute(self, action):
 For `DATABASE_QUERY`: never accept a raw SQL string. Accept a table name + operation enum +
 named parameter dict; build the parameterized query server-side.
 
-### 2.3 ⬜ [GAP] No saga step idempotency keys
+### 2.3 ✅ [GAP] No saga step idempotency keys
+
+**Fixed.** `SagaStep.idempotency_key`, `StepProposal.idempotency_key`,
+`SagaStateStore.step_already_committed`/`mark_step_committed` (table `saga_step_idempotency`),
+coordinator short-circuits already-committed steps before re-execution. Original diagnosis
+kept below for context.
 
 **Location:** `src/orchestrator/coordinator.py:120-188` (`execute_saga`).
 
@@ -289,7 +314,10 @@ if step.idempotency_key and self.db.step_already_committed(saga_id, step.idempot
 
 ## 3. Correctness gaps
 
-### 3.1 ⬜ [GAP] `SagaTransaction` dataclass is dead code; coordinator uses raw `dict`
+### 3.1 ✅ [GAP] `SagaTransaction` dataclass is dead code; coordinator uses raw `dict`
+
+**Fixed.** `active_sagas: dict[str, SagaTransaction]`; `start_transaction_log` constructs the
+dataclass; `get_saga_status` reads typed attributes. Original diagnosis kept below.
 
 **Location:** `src/models.py:131-144` (`SagaTransaction` defined).
 `src/orchestrator/coordinator.py:107-114` (`start_transaction_log` builds a raw dict).
@@ -318,7 +346,10 @@ def start_transaction_log(self, saga_id, goal, tenant_id):
 `get_saga_status` then uses `dataclasses.asdict()` for serialization — no manual dict key
 access.
 
-### 3.2 ⬜ [GAP] No request-ID / correlation-ID in logs
+### 3.2 ✅ [GAP] No request-ID / correlation-ID in logs
+
+**Fixed.** `ContextVar[str]` + Starlette middleware `inject_request_id` sets `X-Request-ID`
+(generated if absent), echoes it on the response. Original diagnosis kept below.
 
 **Location:** `src/main.py` — no middleware injects a request ID. `src/logging_config.py`
 has no request-ID filter.
@@ -348,7 +379,10 @@ Add a `logging.Filter` subclass that reads `_request_id.get()` and injects it in
 `LogRecord`. Configure it in `configure_logging()`. Now every log line — across verifier,
 sandbox, coordinator — carries the same request ID.
 
-### 3.3 ⬜ [GAP] gRPC server requires `make proto` codegen before it can start
+### 3.3 ✅ [GAP] gRPC server requires `make proto` codegen before it can start
+
+**Fixed.** CI `grpc` job runs `scripts/gen_proto.sh` then smoke-tests `build_servicer()`.
+Original diagnosis kept below.
 
 **Location:** `src/grpc_server.py:_load_stubs()` — raises `ImportError` with a helpful
 message if `src/generated/` is absent.
@@ -380,7 +414,13 @@ grpc: proto
     python src/grpc_server.py
 ```
 
-### 3.4 ⬜ [GAP] No timeouts or retries on external calls
+### 3.4 🟡 [GAP] No timeouts or retries on external calls
+
+**Partially fixed.** `neo4j_store.py` now wraps `upsert_relationship`/`get_neighbors`/
+`get_all_relationships` in a `tenacity` retry (`stop_after_attempt(3)`,
+`wait_exponential`) and sets `connection_timeout=settings.neo4j_timeout_s` on the driver.
+**Still open:** `consolidation._llm_summarize` has no timeout/retry on the LLM client call.
+Original diagnosis kept below.
 
 **Locations:**
 - `src/memory/neo4j_store.py` — `driver.session().execute_write(...)` has no timeout.
@@ -417,7 +457,11 @@ def _neo4j_write(self, fn, *args):
     ...
 ```
 
-### 3.5 ⬜ [GAP] No dead-letter / escalation path for `COMPENSATION_FAILED` sagas
+### 3.5 ✅ [GAP] No dead-letter / escalation path for `COMPENSATION_FAILED` sagas
+
+**Fixed.** `_handle_compensation_failure()` marks the saga and calls `db.push_dead_letter()`
+(table `saga_dead_letters`); `GET /saga/dead-letters` exposes `list_dead_letters()` for
+operator review. Original diagnosis kept below.
 
 **Location:** `src/orchestrator/coordinator.py:213-231` — `execute_compensations` logs
 `CRITICAL` and returns when a compensation fails.
@@ -439,7 +483,11 @@ if self.db and hasattr(self.db, "push_dead_letter"):
    an alert rule: any non-zero rate of `compensations_failed_total` → PagerDuty / OpsGenie.
 4. Document the manual resolution runbook in `CONTRIBUTING.md`.
 
-### 3.6 ⬜ [GAP] `/memory/active` has no pagination
+### 3.6 ✅ [GAP] `/memory/active` has no pagination
+
+**Fixed.** `limit: int = Query(default=20, ge=1, le=200)` / `offset: int = Query(default=0,
+ge=0)`; `retrieve_similar_memories(..., limit, offset)` pushes `LIMIT`/`OFFSET` into the SQL
+(and the in-memory fallback). Original diagnosis kept below.
 
 **Location:** `src/main.py:279-298` — `timescale.retrieve_similar_memories(tenant_id, vector)`
 returns all matching rows; the endpoint returns them all.
@@ -513,7 +561,13 @@ memories this is typically 10-100x faster end-to-end.
 Add `S_INIT`, `GAMMA`, and `TAU` as query parameters passed from `settings` so the SQL
 expression stays in sync with the Python implementation.
 
-### 4.3 ⬜ [PERF/STUB] Replace connected-components clustering with DBSCAN
+### 4.3 ✅ [PERF/STUB] Replace connected-components clustering with DBSCAN
+
+**Fixed.** `_cluster()` tries `sklearn.cluster.DBSCAN(eps, min_samples=2, metric="cosine")`
+on unit-normalized vectors first (label `-1` = noise, skipped), falls back to
+connected-components when sklearn is absent or embeddings are ragged. Tests updated:
+`test_isolated_vectors_treated_as_noise` (0 clusters) + new
+`test_two_dense_groups_form_two_clusters`. Original diagnosis kept below.
 
 **Location:** `src/memory/consolidation.py:_cluster`.
 
@@ -546,7 +600,11 @@ This change will alter cluster counts — existing tests that assert specific cl
 need updating. Write new tests that assert: noise points (isolated) are excluded, dense
 groups are merged, and the total number of graph edges written equals the expected value.
 
-### 4.4 ⬜ [PERF] Embedding result caching
+### 4.4 ✅ [PERF] Embedding result caching
+
+**Fixed (in-process LRU; Redis tier still open as a future option).**
+Module-level `@lru_cache(maxsize=4096)` on `_cached_embed(text, model, dim, client)`;
+`EmbeddingService.embed()` delegates to it. Original diagnosis kept below.
 
 **Location:** `src/memory/embedding.py:embed`.
 
@@ -631,10 +689,12 @@ connection checkout.
 
 ## 5. CI/CD gaps
 
-### 5.1 🟡 Integration tests not wired into CI
+### 5.1 ✅ Integration tests not wired into CI
 
-**Current state:** `tests/integration/` exists. `conftest.py` skips the entire package
-unless `RUN_INTEGRATION=1`. The CI workflow (`ci.yml`) runs only the unit suite.
+**Fixed.** `ci.yml` adds an `integration` job (PR-only) with TimescaleDB + Redis + Neo4j
+service containers running `RUN_INTEGRATION=1 pytest -m integration`.
+
+<!-- Original plan kept below for reference of the exact service-container config used. -->
 
 **Fix:** Add a CI job with Docker service containers:
 ```yaml
@@ -673,7 +733,10 @@ integration:
 ```
 Gate this on PRs to `main` only (not every push) to manage CI cost.
 
-### 5.2 ⬜ No container build / publish job in CI
+### 5.2 ✅ No container build / publish job in CI
+
+**Fixed.** `ci.yml` adds a `docker` job (`needs: [lint, test]`, builds via
+`docker/build-push-action`, pushes only on `main`).
 
 **Problem:** The Dockerfile is hardened (non-root, healthcheck, `no-new-privileges`) but is
 never built in CI. A merge that breaks the Docker image won't be caught until someone runs
@@ -698,12 +761,14 @@ docker:
         cache-to: type=gha,mode=max
 ```
 
-### 5.3 ⬜ gRPC codegen not in CI
+### 5.3 ✅ gRPC codegen not in CI
 
-Covered in §3.3. Summary: add a `grpc` CI job that runs `scripts/gen_proto.sh` and smoke-
-tests that `build_servicer()` constructs without error.
+Covered in §3.3 — `grpc` CI job added.
 
-### 5.4 ⬜ No Dependabot / Renovate configuration
+### 5.4 ✅ No Dependabot / Renovate configuration
+
+**Fixed.** `.github/dependabot.yml` added: pip (weekly, dev-deps/observability groups,
+ignores major pydantic/fastapi bumps), docker (weekly), github-actions (weekly).
 
 **Problem:** No `dependabot.yml` or `renovate.json`. Dependency versions in `pyproject.toml`
 are lower-bounded (`>=`) with no upper bounds — any transitive upgrade can silently
@@ -745,7 +810,11 @@ classifiers but is not actually fully typed.
 3. Target `disallow_untyped_defs = true` globally within two release cycles.
 4. Add `--strict` to the mypy CI command once coverage is high.
 
-### 5.6 ⬜ No property-based tests for saga FSM or decay math
+### 5.6 ✅ No property-based tests for saga FSM or decay math
+
+**Fixed.** `tests/test_property_based.py` (gated by `pytest.importorskip("hypothesis")`):
+saga-always-terminal (200 examples), fully-committed-saga (100), retention-in-[0,1] (500),
+deterministic-embedding-unit-norm (100), `contain_path`-stays-inside-root (200).
 
 **Problem:** The saga state machine has a complex transition graph (PENDING → RUNNING →
 COMMITTED / COMPENSATING → ROLLED_BACK / COMPENSATION_FAILED). Unit tests cover
@@ -789,7 +858,13 @@ def test_retention_always_in_unit_interval(s_init, importance, n_access, elapsed
 
 ## 6. Feature roadmap (beyond production parity)
 
-### 6.1 ⬜ Pluggable tool registry
+### 6.1 ✅ Pluggable tool registry
+
+**Fixed.** `ToolDefinition` dataclass (`handler`, `compensation_handler`,
+`wasm_module_path`, `description`) + `ToolRegistry` (`register`/`get`/
+`is_compensation_allowed`/`allowed_actions`/`allowed_compensations`); module-level
+`registry` singleton. `WasmSandbox.execute`/`execute_compensation` delegate to it,
+replacing the hardcoded `frozenset` allow-list. Original design kept below.
 
 **Problem:** `_ALLOWED_ACTIONS` is `frozenset({"WRITE_FILE", "DATABASE_QUERY", "NOOP"})`.
 Adding a new tool requires editing `sandbox.py` — it is not extensible by users without
@@ -825,7 +900,12 @@ registry.register(ToolDefinition("WRITE_FILE", ..., wasm_module_path="tools/writ
 `WasmSandbox.execute` delegates to `registry.get(tool_name)` instead of hardcoded `if/elif`.
 Users register custom tools in their entry-point before starting the server.
 
-### 6.2 ⬜ Scheduled sleep-cycle consolidation
+### 6.2 ✅ Scheduled sleep-cycle consolidation
+
+**Fixed.** `AsyncIOScheduler` (lazy-imported, no-op when `apscheduler` absent) starts in the
+FastAPI lifespan when `settings.consolidation_cron` is set, running
+`consolidator.run_consolidation_cycle` on the configured cron expression. Original design
+kept below.
 
 **Problem:** `POST /memory/consolidate` must be called manually. A real cognitive memory
 system runs consolidation automatically on a schedule (analogous to overnight sleep).
@@ -999,41 +1079,51 @@ saga.commit()
 
 ## 7. Suggested sequencing (realistic sprint order)
 
-### Sprint 1 — Production safety (no new features, only hardening)
-1. **§1.2** — Replace single Postgres connection with `ThreadedConnectionPool`.
-2. **§1.3** — Reject unknown `saga_id` in `execute_saga` instead of auto-creating.
-3. **§2.2** — Add per-tool argument schema validation; remove raw-SQL acceptance from `DATABASE_QUERY`.
-4. **§2.3** — Add idempotency key support to step submission.
-5. **§3.5** — Add dead-letter queue for `COMPENSATION_FAILED` sagas + `/saga/dead-letters` endpoint.
-6. **§5.1** — Wire integration tests into CI with Docker service containers.
+### Sprint 1 — Production safety ✅ DONE
+1. ✅ **§1.2** — `ThreadedConnectionPool`.
+2. ✅ **§1.3** — Reject unknown `saga_id`.
+3. ✅ **§2.2** — Per-tool argument schema validation; no raw SQL.
+4. ✅ **§2.3** — Idempotency key support.
+5. ✅ **§3.5** — Dead-letter queue + `/saga/dead-letters`.
+6. ✅ **§5.1** — Integration tests wired into CI.
 
-### Sprint 2 — Reliability and observability
-7. **§3.4** — Add timeouts + `tenacity` retries on Neo4j / LLM / Z3.
-8. **§3.2** — Add request-ID correlation in logs.
-9. **§3.6** — Paginate `/memory/active`.
-10. **§3.1** — Wire `SagaTransaction` dataclass into coordinator (drop raw dict).
-11. **§1.4** — Fix in-memory state mirror growth (skip mirror write for durable backends).
-12. **§5.3** — Add gRPC codegen CI job.
+### Sprint 2 — Reliability and observability — mostly done
+7. 🟡 **§3.4** — Neo4j timeouts + `tenacity` retries done; **LLM call in `consolidation._llm_summarize` still has no timeout/retry — only remaining item here.**
+8. ✅ **§3.2** — Request-ID correlation in logs.
+9. ✅ **§3.6** — Paginate `/memory/active`.
+10. ✅ **§3.1** — `SagaTransaction` dataclass wired into coordinator.
+11. ✅ **§1.4** — In-memory state mirror growth fixed.
+12. ✅ **§5.3** — gRPC codegen CI job.
 
-### Sprint 3 — Performance
-13. **§4.2** — Push retention filtering to TimescaleDB SQL.
-14. **§4.3** — Replace connected-components clustering with DBSCAN.
-15. **§4.4** — Add LRU + optional Redis cache for embedding results.
-16. **§4.6** — Tune pgvector HNSW index parameters under load.
+### Sprint 3 — Performance — partially done; remaining is genuinely open
+13. ⬜ **§4.2** — Push retention filtering to TimescaleDB SQL. *(Open — highest-value remaining perf item; 100K-memory tenants still materialize full result sets into Python.)*
+14. ✅ **§4.3** — DBSCAN clustering.
+15. ✅ **§4.4** — LRU cache for embedding results (Redis tier still a future option, not required).
+16. ⬜ **§4.6** — Tune pgvector HNSW index parameters under load. *(Open — needs production query-pattern data to tune meaningfully; revisit once there's real traffic.)*
 
-### Sprint 4 — Features (differentiation)
-17. **§6.1** — Pluggable tool registry + WASM-compiled reference tools (closes §2.1 fully).
-18. **§6.2** — APScheduler for automatic sleep-cycle consolidation.
-19. **§6.4** — GraphRAG retrieval integrating the Neo4j concept graph.
-20. **§6.7** — SSE streaming for saga step events; update dashboard to consume the API.
+### Sprint 4 — Features (differentiation) — registry + scheduler done; retrieval/streaming open
+17. ✅ **§6.1** — Pluggable tool registry (WASM-compiled reference tools per §2.1 still future work).
+18. ✅ **§6.2** — APScheduler sleep-cycle consolidation.
+19. ⬜ **§6.4** — GraphRAG retrieval integrating the Neo4j concept graph. *(Open — concept graph is populated by consolidation but never read back during retrieval.)*
+20. ⬜ **§6.7** — SSE streaming for saga step events; update dashboard to consume the API. *(Open.)*
 
-### Sprint 5 — Scale and ecosystem
-21. **§6.3** — Temporal-backed distributed saga orchestration.
-22. **§6.5** — Human-in-the-loop approval gate.
-23. **§6.6** — Replay / time-travel debugging endpoint.
-24. **§6.8** — Multi-tenancy row-level security + per-tenant quotas.
-25. **§6.9** — Python client SDK.
-26. **§4.5** — Rust/PyO3 cosine kernel (only if profiling proves it necessary).
+### Sprint 5 — Scale and ecosystem — all open, lowest priority
+21. ⬜ **§6.3** — Temporal-backed distributed saga orchestration.
+22. ⬜ **§6.5** — Human-in-the-loop approval gate.
+23. ⬜ **§6.6** — Replay / time-travel debugging endpoint.
+24. ⬜ **§6.8** — Multi-tenancy row-level security + per-tenant quotas.
+25. ⬜ **§6.9** — Python client SDK.
+26. ⬜ **§4.5** — Rust/PyO3 cosine kernel (only if profiling proves it necessary — unlikely at current scale).
+
+---
+
+## 7.1 What's left, in priority order
+
+1. **§4.2** (Sprint 3, item 13) — push retention math to SQL. Real perf win once memory counts grow; currently the only "production safety" perf gap left.
+2. **§3.4 LLM timeout** — one missing line in `consolidation._llm_summarize`; trivial, just not done yet.
+3. **§6.4 GraphRAG retrieval** — the semantic graph is built but unused; closing this loop is the highest-leverage *feature* gap (makes consolidation actually pay off).
+4. **§6.7 SSE streaming** — moderate effort, decouples the dashboard from running the engine locally.
+5. Everything in Sprint 5 — genuinely "scale" concerns (distributed orchestration, HITL, replay, multi-tenancy, SDK). Don't start until there's a concrete driver (real multi-tenant load, compliance ask, or external-client demand).
 
 ---
 
