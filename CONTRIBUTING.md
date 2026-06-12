@@ -38,9 +38,7 @@ make cover    # pytest with the coverage gate (>= 80%)
 
 ## Architectural conventions
 
-See [CLAUDE.md](CLAUDE.md) for the day-to-day conventions (single source of truth for
-models, the `settings` singleton, the graceful-degradation pattern, saga semantics). The
-production roadmap and rationale live in [improve.md](improve.md).
+The production roadmap and rationale live in [improve.md](improve.md).
 
 ## Pull requests
 
