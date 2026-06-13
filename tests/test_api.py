@@ -120,6 +120,66 @@ class TestStartSagaEndpoint:
 # ─────────────────────────────────────────────────────────────────────
 
 
+class TestApprovalWorkflow:
+    """Validate /saga/{id}/approve, /reject and /history (§6.5, §6.6)."""
+
+    def test_step_requires_approval_returns_pending(self, client):
+        saga_id = client.post("/saga/start", json={"tenant_id": "tenant-1", "goal": "g"}).json()["saga_id"]
+        resp = client.post(
+            "/saga/step",
+            json={
+                "saga_id": saga_id,
+                "step_name": "risky",
+                "tool_name": "NOOP",
+                "arguments": {},
+                "compensation_tool": "NOOP",
+                "compensation_arguments": {},
+                "invariants": "(assert true)",
+                "requires_approval": True,
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "AWAITING_APPROVAL"
+
+        status_resp = client.get(f"/saga/{saga_id}/status")
+        assert status_resp.json()["status"] == "AWAITING_APPROVAL"
+
+        approve_resp = client.post(f"/saga/{saga_id}/approve")
+        assert approve_resp.status_code == 200
+        assert approve_resp.json()["status"] == "COMMITTED"
+
+        history_resp = client.get(f"/saga/{saga_id}/history")
+        assert history_resp.status_code == 200
+
+    def test_approve_unknown_saga_404(self, client):
+        resp = client.post("/saga/00000000-0000-0000-0000-000000000000/approve")
+        assert resp.status_code == 404
+
+    def test_approve_when_not_awaiting_returns_409(self, client):
+        saga_id = client.post("/saga/start", json={"tenant_id": "tenant-1", "goal": "g"}).json()["saga_id"]
+        resp = client.post(f"/saga/{saga_id}/approve")
+        assert resp.status_code == 409
+
+    def test_reject_rolls_back(self, client):
+        saga_id = client.post("/saga/start", json={"tenant_id": "tenant-1", "goal": "g"}).json()["saga_id"]
+        client.post(
+            "/saga/step",
+            json={
+                "saga_id": saga_id,
+                "step_name": "risky",
+                "tool_name": "NOOP",
+                "arguments": {},
+                "compensation_tool": "NOOP",
+                "compensation_arguments": {},
+                "invariants": "(assert true)",
+                "requires_approval": True,
+            },
+        )
+        reject_resp = client.post(f"/saga/{saga_id}/reject")
+        assert reject_resp.status_code == 200
+        assert reject_resp.json()["status"] == "ROLLED_BACK"
+
+
 class TestUnknownRoutes:
     """Verify that non-existent routes return proper errors."""
 

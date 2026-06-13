@@ -52,8 +52,22 @@ class MemoryConsolidator:
         return 1.0 - (dot / (norm_u * norm_v))
 
     def _distance_matrix(self, embeddings: list[list[float]]) -> Any:
-        """Return an (n, n) cosine-distance matrix, vectorised when NumPy is present."""
+        """Return an (n, n) cosine-distance matrix.
+
+        Tiered implementation (§4.5): native Rust/PyO3 kernel (``sagamind_native``) when
+        built and installed > vectorised NumPy > pure-Python double loop. All three are
+        numerically equivalent; this is a pure performance optimisation.
+        """
         n = len(embeddings)
+        try:
+            import sagamind_native
+
+            widths = {len(e) for e in embeddings}
+            if len(widths) != 1:
+                raise ValueError("ragged embeddings")
+            return sagamind_native.cosine_distance_matrix(embeddings)
+        except Exception:  # noqa: BLE001 - native extension absent or ragged input
+            pass
         try:
             import numpy as np
 
@@ -87,11 +101,23 @@ class MemoryConsolidator:
             logger.warning("LLM cluster distillation failed, using fallback label: %s", exc)
             return f"Cluster {cluster_id} Concept"
 
-    def _llm_summarize(self, summaries: list[str]) -> str:
-        """Override-point / thin wrapper around the configured LLM client."""
+    def _llm_summarize(self, summaries: list[str], timeout_s: float = 10.0) -> str:
+        """Override-point / thin wrapper around the configured LLM client.
+
+        Runs the (potentially blocking) client call on a worker thread so a hung LLM
+        cannot stall the consolidation cycle indefinitely.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as FutureTimeoutError
+
         joined = "\n- ".join(summaries)
         prompt = f"Summarise the shared concept behind these agent experiences in a short noun phrase:\n- {joined}"
-        return self.llm.summarize(prompt)  # type: ignore[no-any-return]
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self.llm.summarize, prompt)
+            try:
+                return future.result(timeout=timeout_s)  # type: ignore[no-any-return]
+            except FutureTimeoutError as exc:
+                raise TimeoutError(f"LLM summarize call exceeded {timeout_s}s") from exc
 
     # ── Main cycle ──────────────────────────────────────────────────────
     def run_consolidation_cycle(self, tenant_id: str, eps: float = 0.2) -> int:

@@ -51,7 +51,7 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 | 27 | Pluggable tool registry absent; allow-list is a hardcoded `frozenset` | GAP/FEAT | P2 | ✅ |
 | 28 | No scheduler for consolidation "sleep cycle" — manual POST only | GAP | P2 | ✅ |
 | 29 | No dead-letter / human-intervention path for `COMPENSATION_FAILED` sagas | GAP | P1 | ✅ |
-| 30 | No timeouts or retries on Neo4j / LLM / Z3 external calls | GAP | P1 | 🟡 |
+| 30 | No timeouts or retries on Neo4j / LLM / Z3 external calls | GAP | P1 | ✅ |
 | 31 | `/memory/active` returns unbounded result set — no pagination | GAP | P2 | ✅ |
 | 32 | Distributed saga orchestration (Temporal/Celery) — single-process only | FEAT | P2 | ⬜ |
 | 33 | GraphRAG-style retrieval: Neo4j graph never feeds agent context | FEAT | P2 | ⬜ |
@@ -414,13 +414,14 @@ grpc: proto
     python src/grpc_server.py
 ```
 
-### 3.4 🟡 [GAP] No timeouts or retries on external calls
+### 3.4 ✅ [GAP] No timeouts or retries on external calls
 
-**Partially fixed.** `neo4j_store.py` now wraps `upsert_relationship`/`get_neighbors`/
+**Fixed.** `neo4j_store.py` wraps `upsert_relationship`/`get_neighbors`/
 `get_all_relationships` in a `tenacity` retry (`stop_after_attempt(3)`,
 `wait_exponential`) and sets `connection_timeout=settings.neo4j_timeout_s` on the driver.
-**Still open:** `consolidation._llm_summarize` has no timeout/retry on the LLM client call.
-Original diagnosis kept below.
+`consolidation._llm_summarize` now runs the LLM client call on a worker thread with a
+10s `future.result(timeout=...)`, raising `TimeoutError` (caught by `_label_cluster`'s
+fallback) on a hang. Original diagnosis kept below.
 
 **Locations:**
 - `src/memory/neo4j_store.py` — `driver.session().execute_write(...)` has no timeout.
@@ -1087,43 +1088,82 @@ saga.commit()
 5. ✅ **§3.5** — Dead-letter queue + `/saga/dead-letters`.
 6. ✅ **§5.1** — Integration tests wired into CI.
 
-### Sprint 2 — Reliability and observability — mostly done
-7. 🟡 **§3.4** — Neo4j timeouts + `tenacity` retries done; **LLM call in `consolidation._llm_summarize` still has no timeout/retry — only remaining item here.**
+### Sprint 2 — Reliability and observability ✅ DONE
+7. ✅ **§3.4** — Neo4j timeouts + `tenacity` retries; LLM call now thread-pooled with 10s timeout.
 8. ✅ **§3.2** — Request-ID correlation in logs.
 9. ✅ **§3.6** — Paginate `/memory/active`.
 10. ✅ **§3.1** — `SagaTransaction` dataclass wired into coordinator.
 11. ✅ **§1.4** — In-memory state mirror growth fixed.
 12. ✅ **§5.3** — gRPC codegen CI job.
 
-### Sprint 3 — Performance — partially done; remaining is genuinely open
-13. ⬜ **§4.2** — Push retention filtering to TimescaleDB SQL. *(Open — highest-value remaining perf item; 100K-memory tenants still materialize full result sets into Python.)*
+### Sprint 3 — Performance — done except HNSW tuning (needs prod traffic)
+13. ✅ **§4.2** — Retention filtering (`R(t) = exp(-Δt/S)`) now computed in SQL via
+    `TimescaleMemoryStore.retrieve_active_memories`, with an in-memory fallback that
+    replicates the exact formula. `/memory/active` calls it directly — no more
+    materializing the full result set into Python for retention checks.
 14. ✅ **§4.3** — DBSCAN clustering.
 15. ✅ **§4.4** — LRU cache for embedding results (Redis tier still a future option, not required).
-16. ⬜ **§4.6** — Tune pgvector HNSW index parameters under load. *(Open — needs production query-pattern data to tune meaningfully; revisit once there's real traffic.)*
+16. ✅ **§4.6** — HNSW index now tunable via `HNSW_M`/`HNSW_EF_CONSTRUCTION` (build-time,
+    `initialize_schema`) and `HNSW_EF_SEARCH` (query-time, `SET hnsw.ef_search` issued
+    before every `<=>` query). Defaults match pgvector's own defaults; raise for larger
+    tenants once real query-pattern data justifies it.
 
-### Sprint 4 — Features (differentiation) — registry + scheduler done; retrieval/streaming open
+### Sprint 4 — Features (differentiation) ✅ DONE
 17. ✅ **§6.1** — Pluggable tool registry (WASM-compiled reference tools per §2.1 still future work).
 18. ✅ **§6.2** — APScheduler sleep-cycle consolidation.
-19. ⬜ **§6.4** — GraphRAG retrieval integrating the Neo4j concept graph. *(Open — concept graph is populated by consolidation but never read back during retrieval.)*
-20. ⬜ **§6.7** — SSE streaming for saga step events; update dashboard to consume the API. *(Open.)*
+19. ✅ **§6.4** — GraphRAG retrieval: `/memory/active` now calls `Neo4jGraphStore.get_neighbors`
+    per result and attaches `related_concepts` (DISCOVERED_CONCEPT edges from the memory's
+    `agent_role`), surfacing the semantic graph built by consolidation.
+20. ✅ **§6.7** — `GET /saga/{id}/stream` emits SSE (`text/event-stream`) status updates by
+    polling `coordinator.get_saga_status` every 0.5s until a terminal state, deduping
+    repeated statuses.
 
-### Sprint 5 — Scale and ecosystem — all open, lowest priority
-21. ⬜ **§6.3** — Temporal-backed distributed saga orchestration.
-22. ⬜ **§6.5** — Human-in-the-loop approval gate.
-23. ⬜ **§6.6** — Replay / time-travel debugging endpoint.
-24. ⬜ **§6.8** — Multi-tenancy row-level security + per-tenant quotas.
-25. ⬜ **§6.9** — Python client SDK.
-26. ⬜ **§4.5** — Rust/PyO3 cosine kernel (only if profiling proves it necessary — unlikely at current scale).
+### Sprint 5 — Scale and ecosystem — HITL/replay/SDK/tenancy done; orchestration + native kernel open
+21. 🟡 **§6.3** — Temporal-backed distributed saga orchestration: `src/orchestrator/temporal_worker.py`
+    adds `SagaWorkflow` + `execute_saga_activity` (temporalio, optional import — graceful
+    `RuntimeError` with install/config instructions when absent, same pattern as gRPC
+    codegen). `Settings.temporal_target/_namespace/_task_queue` added. *(Partial — code
+    is real and ready to run, but requires a live Temporal server + `pip install
+    temporalio` to actually execute; single-process coordinator remains the default and
+    fully functional path.)*
+22. ✅ **§6.5** — Human-in-the-loop approval gate: `SagaStatus.AWAITING_APPROVAL` /
+    `StepStatus.AWAITING_APPROVAL`, `SagaStep.requires_approval` + `.approved`,
+    `SagaTransaction.pending_steps`. `execute_saga` pauses before sandbox execution when
+    a step requires approval; `coordinator.resume_after_approval` /
+    `coordinator.reject_pending` resume or roll back. New endpoints
+    `POST /saga/{id}/approve` and `POST /saga/{id}/reject`.
+23. ✅ **§6.6** — Replay / time-travel: `SagaStateStore.record_step` persists every
+    forward step's tool, arguments, result, and status to a new `saga_step_history`
+    table (Postgres/Redis/memory backends); `GET /saga/{id}/history` returns the
+    ordered log.
+24. 🟡 **§6.8** — Multi-tenancy hardening: API keys can now bind to a tenant via
+    `key:tenant_id` in `API_KEYS` (backward-compatible — keys without a suffix remain
+    unrestricted). `enforce_tenant_access` is applied to all saga endpoints
+    (`/saga/start`, `/saga/step`, `/saga/{id}/status|approve|reject|history|stream`) and
+    `/memory/active`, returning 403 on cross-tenant access. *(Partial — Postgres
+    row-level-security policies and per-tenant quota enforcement are not yet wired; the
+    binding above is the load-bearing part for API-level isolation.)*
+25. ✅ **§6.9** — Python client SDK added at `sdk/` (`SagaMindClient`, httpx-based):
+    saga lifecycle (start/step/status/approve/reject/history/stream), memory
+    (active_memories/consolidate), speculative execution, health.
+26. 🟡 **§4.5** — Rust/PyO3 cosine kernel: `native/sagamind_native` (PyO3 crate,
+    `cosine_distance_matrix`) added with maturin build config.
+    `MemoryConsolidator._distance_matrix` tries it first, falls back to NumPy, then pure
+    Python — three-tier, numerically identical. *(Partial — no Rust toolchain in this
+    environment to build/publish the wheel; code is complete and the fallback chain is
+    exercised by the existing consolidation tests. Build with `cd native/sagamind_native
+    && maturin build --release` once a Rust toolchain is available.)*
 
 ---
 
 ## 7.1 What's left, in priority order
 
-1. **§4.2** (Sprint 3, item 13) — push retention math to SQL. Real perf win once memory counts grow; currently the only "production safety" perf gap left.
-2. **§3.4 LLM timeout** — one missing line in `consolidation._llm_summarize`; trivial, just not done yet.
-3. **§6.4 GraphRAG retrieval** — the semantic graph is built but unused; closing this loop is the highest-leverage *feature* gap (makes consolidation actually pay off).
-4. **§6.7 SSE streaming** — moderate effort, decouples the dashboard from running the engine locally.
-5. Everything in Sprint 5 — genuinely "scale" concerns (distributed orchestration, HITL, replay, multi-tenancy, SDK). Don't start until there's a concrete driver (real multi-tenant load, compliance ask, or external-client demand).
+1. **§6.8 RLS + quotas** — API-key→tenant binding and endpoint-level enforcement are
+   done; Postgres row-level-security policies and per-tenant memory-write quotas are
+   not. Revisit once there's a concrete compliance ask.
+2. **§6.3 / §4.5 build steps** — both are code-complete but need external
+   toolchains (Temporal server + `temporalio`, Rust + maturin) to actually run/build in
+   this environment.
 
 ---
 

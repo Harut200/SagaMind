@@ -57,6 +57,7 @@ class SagaStateStore:
         self._comps: dict[str, list[dict[str, Any]]] = {}
         self._idem: dict[str, set[str]] = {}  # saga_id → committed idempotency keys
         self._dead: list[dict[str, Any]] = []
+        self._history: dict[str, list[dict[str, Any]]] = {}
 
         forced = settings.state_store_backend.lower()
         if forced == "memory":
@@ -158,6 +159,16 @@ class SagaStateStore:
                         step_name   TEXT,
                         error       TEXT,
                         occurred_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    CREATE TABLE IF NOT EXISTS saga_step_history (
+                        id         BIGSERIAL PRIMARY KEY,
+                        saga_id    UUID NOT NULL,
+                        step_name  TEXT,
+                        tool_name  TEXT,
+                        arguments  JSONB,
+                        result     JSONB,
+                        status     VARCHAR(32),
+                        recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     );
                     """
                 )
@@ -326,6 +337,71 @@ class SagaStateStore:
             return [json.loads(r) for r in raw]
         else:
             return list(reversed(self._dead))
+
+    # ── Replay / history ─────────────────────────────────────────────────
+    def record_step(
+        self,
+        saga_id: str,
+        step_name: str,
+        tool_name: str,
+        arguments: dict[str, Any],
+        result: dict[str, Any],
+        status: str,
+    ) -> None:
+        """Append a forward-execution record for replay/time-travel debugging."""
+        entry = {
+            "step_name": step_name,
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "result": result,
+            "status": status,
+        }
+        if self.backend == "postgres":
+            conn = self._pg_conn()
+            try:
+                conn.autocommit = True
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO saga_step_history "
+                        "(saga_id, step_name, tool_name, arguments, result, status) "
+                        "VALUES (%s, %s, %s, %s, %s, %s);",
+                        (saga_id, step_name, tool_name, json.dumps(arguments), json.dumps(result), status),
+                    )
+            finally:
+                self._pg_return(conn)
+        elif self.backend == "redis":
+            self._redis.rpush(f"saga:{saga_id}:history", json.dumps(entry))
+        else:
+            self._history.setdefault(saga_id, []).append(entry)
+
+    def get_history(self, saga_id: str) -> list[dict[str, Any]]:
+        """Return the ordered forward-execution history for a saga."""
+        if self.backend == "postgres":
+            conn = self._pg_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT step_name, tool_name, arguments, result, status, recorded_at "
+                        "FROM saga_step_history WHERE saga_id = %s ORDER BY id;",
+                        (saga_id,),
+                    )
+                    return [
+                        {
+                            "step_name": r[0],
+                            "tool_name": r[1],
+                            "arguments": r[2],
+                            "result": r[3],
+                            "status": r[4],
+                            "recorded_at": r[5].isoformat() if r[5] else None,
+                        }
+                        for r in cur.fetchall()
+                    ]
+            finally:
+                self._pg_return(conn)
+        elif self.backend == "redis":
+            return [json.loads(r) for r in self._redis.lrange(f"saga:{saga_id}:history", 0, -1)]
+        else:
+            return list(self._history.get(saga_id, []))
 
     # ── Reads / recovery ────────────────────────────────────────────────
     def list_incomplete(self) -> list[dict[str, Any]]:

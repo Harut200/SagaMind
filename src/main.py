@@ -47,7 +47,7 @@ from src.memory.decay import EbbinghausMemoryManager
 from src.memory.embedding import EmbeddingService
 from src.memory.neo4j_store import Neo4jGraphStore
 from src.memory.timescale_store import TimescaleMemoryStore
-from src.models import ActionPayload, MemoryNode, SagaStep
+from src.models import ActionPayload, SagaStep
 from src.observability import metrics
 from src.orchestrator.coordinator import CoordinatorError, SagaTransactionCoordinator
 from src.orchestrator.sandbox import WasmSandbox
@@ -209,6 +209,22 @@ def enforce_rate_limit(request: Request, x_api_key: str | None = Header(default=
         )
 
 
+def get_bound_tenant(x_api_key: str | None = Header(default=None)) -> str | None:
+    """Return the tenant_id bound to this API key (``key:tenant_id`` form), or None if unrestricted."""
+    if not x_api_key:
+        return None
+    return settings.api_key_tenant_map.get(x_api_key)
+
+
+def enforce_tenant_access(bound_tenant: str | None, tenant_id: str | None) -> None:
+    """Raise 403 if the API key is bound to a tenant other than *tenant_id*."""
+    if bound_tenant is not None and tenant_id is not None and bound_tenant != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API key is not authorized for this tenant.",
+        )
+
+
 _PROTECTED = [Depends(require_api_key), Depends(enforce_rate_limit)]
 
 
@@ -292,6 +308,7 @@ class StepProposal(BaseModel):
     compensation_arguments: dict[str, Any]
     invariants: str
     idempotency_key: str | None = None
+    requires_approval: bool = False
 
 
 class DraftProposal(BaseModel):
@@ -340,17 +357,28 @@ def prometheus_metrics() -> Response:
     return Response(content=payload, media_type=content_type)
 
 
+def _get_saga_or_404(saga_id: str) -> Any:
+    saga = coordinator.active_sagas.get(saga_id)
+    if saga is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saga not found.")
+    return saga
+
+
 @app.post("/saga/start", dependencies=_PROTECTED)
-def start_saga(payload: StartSagaRequest) -> dict[str, str]:
+def start_saga(payload: StartSagaRequest, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, str]:
     """Initialize a new saga transaction session."""
+    enforce_tenant_access(bound_tenant, payload.tenant_id)
     saga_id = str(uuid.uuid4())
     coordinator.start_transaction_log(saga_id, payload.goal, payload.tenant_id)
     return {"saga_id": saga_id, "status": "RUNNING"}
 
 
 @app.post("/saga/step", dependencies=_PROTECTED)
-def submit_step(payload: StepProposal) -> dict[str, str]:
+def submit_step(payload: StepProposal, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, str]:
     """Submit and execute a single saga step through the verification gate."""
+    saga = _get_saga_or_404(payload.saga_id)
+    enforce_tenant_access(bound_tenant, saga.tenant_id)
+
     _validate_tool_args(payload.tool_name, payload.arguments)
     _validate_tool_args(payload.compensation_tool, payload.compensation_arguments)
 
@@ -361,12 +389,16 @@ def submit_step(payload: StepProposal) -> dict[str, str]:
         compensation=ActionPayload(payload.compensation_tool, payload.compensation_arguments),
         invariants=payload.invariants,
         idempotency_key=payload.idempotency_key,
+        requires_approval=payload.requires_approval,
     )
 
     try:
         success = coordinator.execute_saga(payload.saga_id, [step])
     except CoordinatorError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if saga.status == "AWAITING_APPROVAL":
+        return {"status": "AWAITING_APPROVAL", "step_id": step.step_id}
 
     if not success:
         raise HTTPException(
@@ -380,12 +412,75 @@ def submit_step(payload: StepProposal) -> dict[str, str]:
 
 
 @app.get("/saga/{saga_id}/status", dependencies=_PROTECTED)
-def saga_status(saga_id: str) -> dict[str, Any]:
+def saga_status(saga_id: str, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, Any]:
     """Return the current state of a saga transaction."""
     state = coordinator.get_saga_status(saga_id)
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saga not found.")
+    enforce_tenant_access(bound_tenant, state["tenant_id"])
     return state
+
+
+@app.post("/saga/{saga_id}/approve", dependencies=_PROTECTED)
+def approve_saga_step(saga_id: str, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, str]:
+    """Approve the step currently awaiting human-in-the-loop approval and resume execution."""
+    saga = _get_saga_or_404(saga_id)
+    enforce_tenant_access(bound_tenant, saga.tenant_id)
+    try:
+        success = coordinator.resume_after_approval(saga_id)
+    except CoordinatorError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return {"status": "COMMITTED" if success else saga.status}
+
+
+@app.post("/saga/{saga_id}/reject", dependencies=_PROTECTED)
+def reject_saga_step(saga_id: str, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, str]:
+    """Reject the step awaiting approval, rolling back any already-committed steps."""
+    saga = _get_saga_or_404(saga_id)
+    enforce_tenant_access(bound_tenant, saga.tenant_id)
+    try:
+        coordinator.reject_pending(saga_id)
+    except CoordinatorError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return {"status": "ROLLED_BACK"}
+
+
+@app.get("/saga/{saga_id}/history", dependencies=_PROTECTED)
+def saga_history(saga_id: str, bound_tenant: str | None = Depends(get_bound_tenant)) -> dict[str, Any]:
+    """Return the ordered forward-execution history of a saga for replay/time-travel debugging."""
+    saga = _get_saga_or_404(saga_id)
+    enforce_tenant_access(bound_tenant, saga.tenant_id)
+    history = saga_store.get_history(saga_id) if hasattr(saga_store, "get_history") else []
+    return {"saga_id": saga_id, "history": history}
+
+
+@app.get("/saga/{saga_id}/stream", dependencies=_PROTECTED)
+async def stream_saga(saga_id: str, bound_tenant: str | None = Depends(get_bound_tenant)) -> Any:
+    """Stream saga status updates as Server-Sent Events until a terminal state is reached."""
+    import asyncio
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    saga = _get_saga_or_404(saga_id)
+    enforce_tenant_access(bound_tenant, saga.tenant_id)
+
+    terminal = {"COMMITTED", "ROLLED_BACK", "FAILED", "COMPENSATION_FAILED"}
+
+    async def event_source() -> AsyncGenerator[str]:
+        last_status: str | None = None
+        while True:
+            state = coordinator.get_saga_status(saga_id)
+            if state is None:
+                break
+            if state["status"] != last_status:
+                yield f"data: {_json.dumps(state)}\n\n"
+                last_status = state["status"]
+            if state["status"] in terminal:
+                break
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
 
 
 @app.get("/saga/dead-letters", dependencies=_PROTECTED)
@@ -409,25 +504,29 @@ def get_active_memories(
     query: str | None = None,
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    bound_tenant: str | None = Depends(get_bound_tenant),
 ) -> dict[str, Any]:
-    """Retrieve active (non-evicted) memories for a tenant, optionally ranked by *query*."""
-    query_vector = embedding_service.embed(query) if query else [0.0] * settings.embedding_dim
-    memories = timescale.retrieve_similar_memories(tenant_id, query_vector, limit=limit, offset=offset)
+    """Retrieve active (non-evicted) memories for a tenant, optionally ranked by *query*.
 
-    active = []
-    for m in memories:
-        node = MemoryNode(
-            memory_id=m["memory_id"],
-            created_at=m["created_at"],
-            last_retrieved_at=m["last_retrieved_at"],
-            agent_role=m["agent_role"],
-            summary=m["summary"],
-            importance_score=m["importance_score"],
-            retrieval_count=m["retrieval_count"],
-            embedding=m.get("embedding", []),
-        )
-        if memory_manager.calculate_retention(node) >= memory_manager.tau:
-            active.append(m)
+    Retention filtering (Ebbinghaus decay) is pushed into SQL (§4.2). Each memory is
+    augmented with related concepts surfaced from the semantic graph (§6.4 GraphRAG).
+    """
+    enforce_tenant_access(bound_tenant, tenant_id)
+    query_vector = embedding_service.embed(query) if query else [0.0] * settings.embedding_dim
+    active = timescale.retrieve_active_memories(
+        tenant_id,
+        query_vector,
+        s_init=memory_manager.s_init,
+        gamma=memory_manager.gamma,
+        tau=memory_manager.tau,
+        limit=limit,
+        offset=offset,
+    )
+
+    for m in active:
+        neighbors = neo4j.get_neighbors(m["agent_role"])
+        m["related_concepts"] = [n["target"] for n in neighbors if n.get("type") == "DISCOVERED_CONCEPT"]
+
     return {
         "active_memories": active,
         "limit": limit,

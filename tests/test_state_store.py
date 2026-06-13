@@ -36,6 +36,21 @@ class TestStateLifecycle:
         assert all(s["saga_id"] != "s2" for s in store.list_incomplete())
 
 
+class TestStepHistory:
+    def test_record_and_get_history(self):
+        store = SagaStateStore()
+        store.record_step("s4", "step-1", "WRITE_FILE", {"path": "/a"}, {"status": "SUCCESS"}, "COMMITTED")
+        store.record_step("s4", "step-2", "NOOP", {}, {}, "COMMITTED")
+        history = store.get_history("s4")
+        assert [h["step_name"] for h in history] == ["step-1", "step-2"]
+        assert history[0]["tool_name"] == "WRITE_FILE"
+        assert history[0]["status"] == "COMMITTED"
+
+    def test_history_empty_for_unknown_saga(self):
+        store = SagaStateStore()
+        assert store.get_history("nonexistent") == []
+
+
 class TestCompensationLog:
     def test_compensations_recorded_in_order(self):
         store = SagaStateStore()

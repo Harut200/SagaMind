@@ -84,6 +84,11 @@ class TimescaleMemoryStore:
         except Exception as exc:  # noqa: BLE001 - adapter is optional, fall back to literals
             logger.debug("pgvector adapter unavailable, using text literals: %s", exc)
 
+    @staticmethod
+    def _set_ef_search(cursor: Any) -> None:
+        """Set the per-session HNSW query-time search width (§4.6, ``HNSW_EF_SEARCH``)."""
+        cursor.execute(f"SET hnsw.ef_search = {settings.hnsw_ef_search};")
+
     def _bind_embedding(self, embedding: list[float]) -> Any:
         return embedding if self._vector_registered else _vector_literal(embedding)
 
@@ -112,9 +117,14 @@ class TimescaleMemoryStore:
                 )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_episodic_tenant ON episodic_memories (tenant_id);")
                 # Approximate-nearest-neighbour index for cosine similarity search.
+                # m / ef_construction are tunable via HNSW_M / HNSW_EF_CONSTRUCTION (§4.6) —
+                # defaults match pgvector's own defaults; raise for higher recall on larger tenants.
                 cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_episodic_embedding "
-                    "ON episodic_memories USING hnsw (embedding vector_cosine_ops);"
+                    f"""
+                    CREATE INDEX IF NOT EXISTS idx_episodic_embedding
+                    ON episodic_memories USING hnsw (embedding vector_cosine_ops)
+                    WITH (m = {settings.hnsw_m}, ef_construction = {settings.hnsw_ef_construction});
+                    """
                 )
                 conn.commit()
             logger.info("TimescaleDB schema checked and initialized.")
@@ -204,6 +214,7 @@ class TimescaleMemoryStore:
         memories: list[dict[str, Any]] = []
         try:
             with conn.cursor() as cursor:
+                self._set_ef_search(cursor)
                 cursor.execute(
                     """
                     SELECT memory_id, created_at, last_retrieved_at, agent_role,
@@ -221,6 +232,100 @@ class TimescaleMemoryStore:
         finally:
             self.pool.putconn(conn)
         return memories
+
+    def retrieve_active_memories(
+        self,
+        tenant_id: str,
+        query_embedding: list[float],
+        s_init: float,
+        gamma: float,
+        tau: float,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Return cosine-similar memories whose Ebbinghaus retention is >= tau, computed in SQL.
+
+        Mirrors ``EbbinghausMemoryManager.calculate_retention``:
+            S = s_init * (1 + gamma * ln(retrieval_count + 1)) * importance_score
+            R = exp(-hours_since_last_retrieved / S)
+        """
+        if not self.pool_active:
+            return self._fallback_active(tenant_id, query_embedding, s_init, gamma, tau, limit, offset)
+
+        conn = self.pool.getconn()
+        memories: list[dict[str, Any]] = []
+        try:
+            with conn.cursor() as cursor:
+                self._set_ef_search(cursor)
+                cursor.execute(
+                    """
+                    SELECT memory_id, created_at, last_retrieved_at, agent_role,
+                           summary, importance_score, retrieval_count, embedding, context_data,
+                           EXP(
+                               -EXTRACT(EPOCH FROM (now() - last_retrieved_at)) / 3600.0
+                               / GREATEST(%s * (1 + %s * LN(retrieval_count + 1)) * importance_score, 1e-9)
+                           ) AS retention
+                    FROM episodic_memories
+                    WHERE tenant_id = %s
+                    AND EXP(
+                            -EXTRACT(EPOCH FROM (now() - last_retrieved_at)) / 3600.0
+                            / GREATEST(%s * (1 + %s * LN(retrieval_count + 1)) * importance_score, 1e-9)
+                        ) >= %s
+                    ORDER BY embedding <=> %s
+                    LIMIT %s OFFSET %s;
+                    """,
+                    (
+                        s_init,
+                        gamma,
+                        tenant_id,
+                        s_init,
+                        gamma,
+                        tau,
+                        self._bind_embedding(query_embedding),
+                        limit,
+                        offset,
+                    ),
+                )
+                for r in cursor.fetchall():
+                    memory = self._row_to_dict(r[:9])
+                    memory["retention"] = float(r[9])
+                    memories.append(memory)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to query active memories in TimescaleDB: %s", exc)
+        finally:
+            self.pool.putconn(conn)
+        return memories
+
+    def _fallback_active(
+        self,
+        tenant_id: str,
+        query_embedding: list[float],
+        s_init: float,
+        gamma: float,
+        tau: float,
+        limit: int,
+        offset: int,
+    ) -> list[dict[str, Any]]:
+        now = datetime.now(timezone.utc)
+        out: list[tuple[dict[str, Any], float, float]] = []
+        for item in self.fallback_storage:
+            if item["tenant_id"] != tenant_id:
+                continue
+            strength = s_init * (1 + gamma * math.log(item["retrieval_count"] + 1)) * item["importance_score"]
+            strength = max(strength, 1e-9)
+            last = item["last_retrieved_at"]
+            hours = (now - last).total_seconds() / 3600.0
+            retention = math.exp(-hours / strength)
+            if retention >= tau:
+                sim = _cosine_similarity(item["embedding"], query_embedding)
+                out.append((item, sim, retention))
+        out.sort(key=lambda x: x[1], reverse=True)
+        results = []
+        for item, _sim, retention in out[offset : offset + limit]:
+            m = dict(item)
+            m["retention"] = retention
+            results.append(m)
+        return results
 
     def get_all_memories(self, tenant_id: str) -> list[dict[str, Any]]:
         """Retrieve every episodic memory for a tenant (used during consolidation)."""

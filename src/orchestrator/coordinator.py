@@ -186,9 +186,22 @@ class SagaTransactionCoordinator:
                     self.execute_compensations(saga_id, completed, callback)
                     return False
 
+                # 1b. Human-in-the-loop approval gate
+                if step.requires_approval and not step.approved:
+                    step.status = StepStatus.AWAITING_APPROVAL.value
+                    saga.status = SagaStatus.AWAITING_APPROVAL.value
+                    idx = steps.index(step)
+                    saga.pending_steps = steps[idx:]
+                    logger.info("[SAGA-%s] Step '%s' awaiting human approval.", saga_id, step.step_name)
+                    if callback:
+                        callback(step, StepStatus.AWAITING_APPROVAL.value, "")
+                    if self.db:
+                        self.db.write_transaction_state(saga_id, SagaStatus.AWAITING_APPROVAL.value, {})
+                    return False
+
                 # 2. Execute in sandbox
                 with metrics.time("step_seconds"):
-                    self.sandbox.execute(step.action)
+                    result = self.sandbox.execute(step.action)
                 step.status = StepStatus.COMMITTED.value
                 completed.append(step)
 
@@ -197,6 +210,15 @@ class SagaTransactionCoordinator:
                     self.db.append_compensation(saga_id, step.compensation.tool_name, step.compensation.arguments)
                 if step.idempotency_key and self.db and hasattr(self.db, "mark_step_committed"):
                     self.db.mark_step_committed(saga_id, step.idempotency_key)
+                if self.db and hasattr(self.db, "record_step"):
+                    self.db.record_step(
+                        saga_id,
+                        step.step_name,
+                        step.action.tool_name,
+                        step.action.arguments,
+                        getattr(result, "data", {}) if result is not None else {},
+                        step.status,
+                    )
 
                 logger.info("[SAGA-%s] Step '%s' executed and committed successfully.", saga_id, step.step_name)
                 if callback:
@@ -223,6 +245,33 @@ class SagaTransactionCoordinator:
             self.db.write_transaction_state(saga_id, SagaStatus.COMMITTED.value, {})
         logger.info("[SAGA-%s] Saga transaction committed successfully.", saga_id)
         self._evict_if_needed()
+        return True
+
+    # ── Human-in-the-loop approval ──────────────────────────────────────
+    def resume_after_approval(self, saga_id: str, callback: Callable[[Any, str, str], None] | None = None) -> bool:
+        """Approve the pending step and resume saga execution."""
+        if saga_id not in self.active_sagas:
+            raise CoordinatorError(f"Saga '{saga_id}' not found.")
+        saga = self.active_sagas[saga_id]
+        if saga.status != SagaStatus.AWAITING_APPROVAL.value or not saga.pending_steps:
+            raise CoordinatorError(f"Saga '{saga_id}' is not awaiting approval.")
+        pending = saga.pending_steps
+        saga.pending_steps = []
+        pending[0].approved = True
+        saga.status = SagaStatus.RUNNING.value
+        return self.execute_saga(saga_id, pending, callback)
+
+    def reject_pending(self, saga_id: str, callback: Callable[[Any, str, str], None] | None = None) -> bool:
+        """Reject the pending step, rolling back any previously committed steps."""
+        if saga_id not in self.active_sagas:
+            raise CoordinatorError(f"Saga '{saga_id}' not found.")
+        saga = self.active_sagas[saga_id]
+        if saga.status != SagaStatus.AWAITING_APPROVAL.value:
+            raise CoordinatorError(f"Saga '{saga_id}' is not awaiting approval.")
+        for step in saga.pending_steps:
+            step.status = StepStatus.ROLLED_BACK.value
+        saga.pending_steps = []
+        self.execute_compensations(saga_id, saga.completed_steps, callback)
         return True
 
     # ── Compensations ────────────────────────────────────────────────────

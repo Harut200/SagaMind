@@ -150,5 +150,7 @@ module = [
     "apscheduler.*",
     "sklearn.*",
     "src.generated.*",
+    "temporalio.*",
+    "sagamind_native",
 ]
 ignore_missing_imports = true

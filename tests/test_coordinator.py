@@ -278,6 +278,81 @@ class TestCompensationFailure:
 # ─────────────────────────────────────────────────────────────────────
 
 
+class TestHumanInTheLoopApproval:
+    """Validate the AWAITING_APPROVAL pause/resume/reject gate (§6.5)."""
+
+    def test_step_requiring_approval_pauses_saga(self, coordinator, mock_sandbox):
+        coordinator.start_transaction_log("saga-approve", "needs approval", "tenant-1")
+        step = SagaStep(
+            step_id="s1",
+            step_name="risky step",
+            action=ActionPayload("NOOP", {}),
+            compensation=ActionPayload("NOOP", {}),
+            invariants="(assert true)",
+            requires_approval=True,
+        )
+        result = coordinator.execute_saga("saga-approve", [step])
+
+        assert result is False
+        saga = coordinator.active_sagas["saga-approve"]
+        assert saga.status == "AWAITING_APPROVAL"
+        assert step.status == "AWAITING_APPROVAL"
+        assert saga.pending_steps == [step]
+        mock_sandbox.execute.assert_not_called()
+
+    def test_approve_resumes_and_commits(self, coordinator, mock_sandbox):
+        coordinator.start_transaction_log("saga-approve-2", "needs approval", "tenant-1")
+        step = SagaStep(
+            step_id="s1",
+            step_name="risky step",
+            action=ActionPayload("NOOP", {}),
+            compensation=ActionPayload("NOOP", {}),
+            invariants="(assert true)",
+            requires_approval=True,
+        )
+        coordinator.execute_saga("saga-approve-2", [step])
+
+        result = coordinator.resume_after_approval("saga-approve-2")
+
+        assert result is True
+        assert step.approved is True
+        assert step.status == "COMMITTED"
+        assert coordinator.active_sagas["saga-approve-2"].status == "COMMITTED"
+        mock_sandbox.execute.assert_called_once()
+
+    def test_reject_rolls_back_completed_steps(self, coordinator, mock_sandbox, sample_steps):
+        coordinator.start_transaction_log("saga-approve-3", "needs approval", "tenant-1")
+        approval_step = SagaStep(
+            step_id="s-final",
+            step_name="risky step",
+            action=ActionPayload("NOOP", {}),
+            compensation=ActionPayload("NOOP", {}),
+            invariants="(assert true)",
+            requires_approval=True,
+        )
+        steps = [*sample_steps, approval_step]
+        result = coordinator.execute_saga("saga-approve-3", steps)
+
+        assert result is False
+        assert coordinator.active_sagas["saga-approve-3"].status == "AWAITING_APPROVAL"
+
+        coordinator.reject_pending("saga-approve-3")
+
+        assert coordinator.active_sagas["saga-approve-3"].status == "ROLLED_BACK"
+        assert approval_step.status == "ROLLED_BACK"
+        # the previously-committed sample_steps were compensated
+        assert mock_sandbox.execute_compensation.call_count == len(sample_steps)
+
+    def test_resume_without_pending_raises(self, coordinator):
+        coordinator.start_transaction_log("saga-approve-4", "goal", "tenant-1")
+        import pytest
+
+        from src.orchestrator.coordinator import CoordinatorError
+
+        with pytest.raises(CoordinatorError):
+            coordinator.resume_after_approval("saga-approve-4")
+
+
 class TestCallbackInvocation:
     """Validate that the optional callback receives correct lifecycle events."""
 

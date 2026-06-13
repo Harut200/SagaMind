@@ -102,6 +102,19 @@ class Settings(BaseSettings):
     # Cron expression for automatic sleep-cycle consolidation. Empty = disabled.
     consolidation_cron: str = ""
 
+    # ── pgvector HNSW tuning (§4.6) ─────────────────────────────────────
+    # Index build params: higher m/ef_construction = better recall, slower build.
+    hnsw_m: int = 16
+    hnsw_ef_construction: int = 64
+    # Per-session query-time search width: higher = better recall, slower query.
+    hnsw_ef_search: int = 40
+
+    # ── Distributed orchestration (§6.3) ───────────────────────────────
+    # Temporal server target. Empty = disabled (single-process saga execution).
+    temporal_target: str = ""
+    temporal_namespace: str = "default"
+    temporal_task_queue: str = "sagamind-sagas"
+
     # ── Derived helpers ─────────────────────────────────────────────────
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -116,7 +129,26 @@ class Settings(BaseSettings):
     @property
     def api_key_set(self) -> set[str]:
         """Parsed set of accepted API keys (empty => auth disabled)."""
-        return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+        return set(self.api_key_tenant_map)
+
+    @property
+    def api_key_tenant_map(self) -> dict[str, str | None]:
+        """Parsed API keys, optionally bound to a tenant via ``key:tenant_id``.
+
+        A key with no ``:tenant_id`` suffix is unrestricted (usable for any tenant),
+        preserving backward compatibility with plain comma-separated key lists.
+        """
+        out: dict[str, str | None] = {}
+        for raw in self.api_keys.split(","):
+            entry = raw.strip()
+            if not entry:
+                continue
+            if ":" in entry:
+                key, tenant_id = entry.split(":", 1)
+                out[key.strip()] = tenant_id.strip() or None
+            else:
+                out[entry] = None
+        return out
 
     @property
     def cors_origin_list(self) -> list[str]:

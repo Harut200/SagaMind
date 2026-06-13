@@ -28,6 +28,7 @@ class SagaStatus(str, enum.Enum):
 
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
     COMMITTED = "COMMITTED"
     COMPENSATING = "COMPENSATING"
     ROLLED_BACK = "ROLLED_BACK"
@@ -40,6 +41,7 @@ class StepStatus(str, enum.Enum):
 
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
     COMMITTED = "COMMITTED"
     FAILED = "FAILED"
     COMPENSATING = "COMPENSATING"
@@ -83,6 +85,8 @@ class SagaStep:
     status: str = StepStatus.PENDING.value
     error: str = ""
     idempotency_key: str | None = None
+    requires_approval: bool = False
+    approved: bool = False
 
 
 @dataclass
@@ -148,3 +152,4 @@ class SagaTransaction:
     status: str = SagaStatus.RUNNING.value
     start_time: float = 0.0
     completed_steps: list[SagaStep] = field(default_factory=list)
+    pending_steps: list[SagaStep] = field(default_factory=list)

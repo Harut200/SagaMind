@@ -179,7 +179,16 @@ class TestSagaStatus:
     """Validate SagaStatus enum members and string behaviour."""
 
     def test_all_members_exist(self):
-        expected = {"PENDING", "RUNNING", "COMMITTED", "COMPENSATING", "ROLLED_BACK", "FAILED", "COMPENSATION_FAILED"}
+        expected = {
+            "PENDING",
+            "RUNNING",
+            "AWAITING_APPROVAL",
+            "COMMITTED",
+            "COMPENSATING",
+            "ROLLED_BACK",
+            "FAILED",
+            "COMPENSATION_FAILED",
+        }
         actual = {s.value for s in SagaStatus}
         assert actual == expected
 
@@ -188,14 +197,23 @@ class TestSagaStatus:
         assert SagaStatus.COMMITTED == "COMMITTED"
 
     def test_member_count(self):
-        assert len(SagaStatus) == 7
+        assert len(SagaStatus) == 8
 
 
 class TestStepStatus:
     """Validate StepStatus enum members and string behaviour."""
 
     def test_all_members_exist(self):
-        expected = {"PENDING", "RUNNING", "COMMITTED", "FAILED", "COMPENSATING", "ROLLED_BACK", "COMPENSATION_FAILED"}
+        expected = {
+            "PENDING",
+            "RUNNING",
+            "AWAITING_APPROVAL",
+            "COMMITTED",
+            "FAILED",
+            "COMPENSATING",
+            "ROLLED_BACK",
+            "COMPENSATION_FAILED",
+        }
         actual = {s.value for s in StepStatus}
         assert actual == expected
 
@@ -204,7 +222,7 @@ class TestStepStatus:
         assert StepStatus.FAILED == "FAILED"
 
     def test_member_count(self):
-        assert len(StepStatus) == 7
+        assert len(StepStatus) == 8
 
 
 # ─────────────────────────────────────────────────────────────────────
