@@ -138,7 +138,7 @@ class Neo4jGraphStore:
                 return [dict(record) for record in result]
 
         try:
-            return _run()
+            return list(_run())
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to query neighbors from Neo4j graph: %s", exc)
             return []
@@ -161,7 +161,7 @@ class Neo4jGraphStore:
                 return [dict(record) for record in result]
 
         try:
-            return _run()
+            return list(_run())
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to query relationships from Neo4j graph: %s", exc)
             return []

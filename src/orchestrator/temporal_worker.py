@@ -87,11 +87,12 @@ try:
 
         @workflow.run
         async def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-            return await workflow.execute_activity(
+            result: dict[str, Any] = await workflow.execute_activity(
                 execute_saga_activity,
                 payload,
                 start_to_close_timeout=timedelta(minutes=10),
             )
+            return result
 
     _TEMPORAL_AVAILABLE = True
 except ImportError:

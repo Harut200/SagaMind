@@ -84,6 +84,13 @@ observability = [
     "opentelemetry-sdk>=1.25.0",
     "opentelemetry-instrumentation-fastapi>=0.46b0",
 ]
+mcp = [
+    "mcp>=1.0.0",
+    "httpx>=0.24.0",
+]
+temporal = [
+    "temporalio>=1.7.0",
+]
 integration = [
     "testcontainers>=4.0.0",
     "redis>=5.0.0",
@@ -152,5 +159,6 @@ module = [
     "src.generated.*",
     "temporalio.*",
     "sagamind_native",
+    "mcp.*",
 ]
 ignore_missing_imports = true
